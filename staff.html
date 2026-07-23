@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>감탄 액자 — 발급</title>
+<style>
+  :root{
+    --paper:#FAF7F2; --card:#FFF; --ink:#241F1A; --ink-2:#5A5148;
+    --muted:#8C8177; --brass:#9A7B45; --brass-soft:#F2EAD9;
+    --danger:#A4453A; --ok:#3F7A4C; --line:#E6DFD4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:60px;
+  }
+  .wrap{max-width:600px;margin:0 auto;padding:0 18px}
+  [hidden]{display:none !important}
+
+  header{padding:26px 0 18px}
+  .brand{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
+  header h1{font-size:22px;font-weight:600;margin-top:7px}
+  header p{font-size:13px;color:var(--muted);margin-top:3px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:14px}
+  .card h2{font-size:15px;font-weight:600;margin-bottom:4px}
+  .card .sub{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:5px}
+  .field input{
+    width:100%;font:inherit;font-size:15px;padding:11px;
+    border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);
+  }
+  .field input:focus{outline:2px solid var(--brass);outline-offset:-1px;border-color:transparent}
+  .field .note{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  button{font:inherit;cursor:pointer}
+  .primary{
+    width:100%;background:var(--ink);color:var(--paper);border:0;border-radius:9px;
+    font-size:15px;font-weight:600;padding:14px;
+  }
+  .primary:disabled{background:var(--muted);cursor:default}
+  .ghost{
+    background:transparent;color:var(--ink-2);border:1px solid var(--line);
+    border-radius:7px;font-size:12.5px;padding:7px 12px;
+  }
+  .ghost:hover{background:var(--paper)}
+
+  .msg{font-size:13px;margin-top:12px;min-height:20px}
+  .msg.bad{color:var(--danger)}
+  .msg.good{color:var(--ok)}
+
+  /* 발급 결과 */
+  #result{border-color:var(--brass);background:#FFFDF9}
+  .out{margin-bottom:15px}
+  .out .k{font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+  .out .v{
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+    background:var(--paper);border:1px solid var(--line);border-radius:7px;
+    padding:9px 11px;word-break:break-all;line-height:1.7;
+  }
+  .out .row{display:flex;gap:8px;align-items:flex-start}
+  .out .row .v{flex:1}
+  .big{
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:24px;font-weight:700;
+    letter-spacing:.08em;color:#6B5327;background:var(--brass-soft);
+    border-radius:8px;padding:12px 16px;text-align:center;
+  }
+  .warn{
+    font-size:12.5px;color:var(--ink-2);background:#FBF3E8;
+    border:1px solid #EBDCC2;border-radius:8px;padding:11px 13px;margin-top:6px;line-height:1.7;
+  }
+
+  /* 목록 */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}
+  th{font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;font-weight:500}
+  td .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .dim{color:var(--muted)}
+
+  #boot,#gate{min-height:70vh;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+
+<div id="boot">불러오는 중…</div>
+
+<div id="login" class="wrap" hidden style="max-width:340px;padding-top:16vh">
+  <div class="brand">Gamtan</div>
+  <h1 style="font-size:22px;font-weight:600;margin:9px 0 4px">액자 발급</h1>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:22px">직원용 화면입니다</p>
+  <div class="field"><label for="e">이메일</label><input id="e" type="email" autocomplete="username"></div>
+  <div class="field"><label for="p">비밀번호</label><input id="p" type="password" autocomplete="current-password"></div>
+  <p class="msg bad" id="loginErr"></p>
+  <button class="primary" id="signin">로그인</button>
+</div>
+
+<div id="gate" hidden>
+  이 계정은 직원으로 등록되어 있지 않습니다.<br>
+  <button class="ghost" id="out2" style="margin-top:14px">로그아웃</button>
+</div>
+
+<div id="app" class="wrap" hidden>
+  <header>
+    <div class="brand">Gamtan</div>
+    <h1>액자 발급</h1>
+    <p>고객 정보를 넣으면 액자와 계정이 한 번에 만들어집니다</p>
+  </header>
+
+  <div class="card">
+    <h2>새 액자 발급</h2>
+    <div class="sub">액자 번호는 자동으로 다음 번호가 매겨집니다</div>
+
+    <div class="field">
+      <label for="label">액자 이름</label>
+      <input id="label" type="text" placeholder="예: 김현지님 부모님 액자" maxlength="40">
+      <div class="note">관리 화면 맨 위에 표시됩니다</div>
+    </div>
+
+    <div class="field">
+      <label for="cemail">고객 이메일</label>
+      <input id="cemail" type="email" placeholder="customer@example.com" autocomplete="off">
+      <div class="note">자녀분이 로그인할 아이디입니다</div>
+    </div>
+
+    <div class="field">
+      <label for="cpw">비밀번호</label>
+      <input id="cpw" type="text" autocomplete="off">
+      <div class="note">6자 이상. 고객에게 그대로 알려주세요</div>
+    </div>
+
+    <button class="primary" id="issue">발급하기</button>
+    <p class="msg" id="msg"></p>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <h2>발급 완료</h2>
+    <div class="sub">아래 내용을 고객에게 전달하세요</div>
+
+    <div class="out">
+      <div class="k">액자 번호</div>
+      <div class="big" id="rCode">—</div>
+    </div>
+
+    <div class="out">
+      <div class="k">고객이 쓸 관리 주소</div>
+      <div class="row">
+        <div class="v" id="rAdmin">—</div>
+        <button class="ghost" data-copy="rAdmin">복사</button>
+      </div>
+    </div>
+
+    <div class="out">
+      <div class="k">액자 기기에 넣을 주소</div>
+      <div class="row">
+        <div class="v" id="rFrame">—</div>
+        <button class="ghost" data-copy="rFrame">복사</button>
+      </div>
+      <div class="warn">
+        이 주소는 고객에게 주지 마세요. 액자 기기의 시작 페이지에만 넣습니다.
+        주소를 아는 사람은 이 액자 사진을 볼 수 있습니다.
+      </div>
+    </div>
+
+    <div class="out">
+      <div class="k">고객 안내 문구</div>
+      <div class="row">
+        <div class="v" id="rGuide">—</div>
+        <button class="ghost" data-copy="rGuide">복사</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>발급한 액자</h2>
+    <div class="sub" id="listSub">불러오는 중…</div>
+    <table>
+      <thead><tr><th>번호</th><th>이름</th><th>마지막 확인</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <button class="ghost" id="out">로그아웃</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+var SB_URL  = "https://sdjhvtljrzkvniwdtwir.supabase.co";
+var SB_KEY  = "sb_publishable_qoIwl7-UfHB2L3LsqnCu-g_t-_6B53R";
+var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.html / frame.html */
+
+(function(){
+  "use strict";
+  var sb = window.supabase.createClient(SB_URL, SB_KEY);
+  var $ = function(i){ return document.getElementById(i); };
+
+  /* ---------- 로그인 ---------- */
+  $("signin").addEventListener("click", signIn);
+  $("p").addEventListener("keydown", function(e){ if(e.key === "Enter") signIn(); });
+
+  function signIn(){
+    var b = $("signin");
+    $("loginErr").textContent = ""; b.disabled = true; b.textContent = "로그인 중…";
+    sb.auth.signInWithPassword({ email: $("e").value.trim(), password: $("p").value })
+      .then(function(r){
+        b.disabled = false; b.textContent = "로그인";
+        if(r.error){ $("loginErr").textContent = "이메일이나 비밀번호를 확인해주세요"; return; }
+        start();
+      });
+  }
+  function bye(){ sb.auth.signOut().then(function(){ location.reload(); }); }
+  $("out").addEventListener("click", bye);
+  $("out2").addEventListener("click", bye);
+
+  sb.auth.getSession().then(function(r){
+    if(r.data && r.data.session) start();
+    else { $("boot").hidden = true; $("login").hidden = false; }
+  });
+
+  function start(){
+    $("boot").hidden = false; $("login").hidden = true;
+    $("boot").textContent = "권한을 확인하는 중…";
+    sb.rpc("is_staff").then(function(r){
+      if(r.error || r.data !== true){
+        $("boot").hidden = true; $("gate").hidden = false; return;
+      }
+      $("boot").hidden = true; $("app").hidden = false;
+      loadList();
+    });
+  }
+
+  /* ---------- 발급 ---------- */
+  $("issue").addEventListener("click", function(){
+    var label = $("label").value.trim();
+    var email = $("cemail").value.trim();
+    var pw    = $("cpw").value;
+    var m     = $("msg");
+
+    m.className = "msg";
+    if(!email || email.indexOf("@") < 0){ m.className = "msg bad"; m.textContent = "고객 이메일을 확인해주세요"; return; }
+    if(pw.length < 6){ m.className = "msg bad"; m.textContent = "비밀번호는 6자 이상이어야 합니다"; return; }
+
+    var btn = $("issue");
+    btn.disabled = true; btn.textContent = "발급 중…";
+    m.textContent = "";
+
+    var frame = null;
+
+    nextCode()
+      .then(function(code){
+        return sb.from("frames").insert({ code: code, label: label || null })
+                 .select("id, code, token").single();
+      })
+      .then(function(r){
+        if(r.error) throw new Error("액자를 만들지 못했습니다");
+        frame = r.data;
+        return ensureUser(email, pw);
+      })
+      .then(function(uid){
+        return sb.from("frame_members")
+                 .insert({ frame_id: frame.id, user_id: uid, role: "owner" });
+      })
+      .then(function(r){
+        if(r.error) throw new Error("계정과 액자를 연결하지 못했습니다");
+        show(frame, email, pw);
+        m.className = "msg good";
+        m.textContent = "발급되었습니다";
+        $("label").value = ""; $("cemail").value = ""; $("cpw").value = "";
+        loadList();
+      })
+      .catch(function(err){
+        m.className = "msg bad";
+        m.textContent = (err && err.message) || "발급에 실패했습니다";
+      })
+      .then(function(){
+        btn.disabled = false; btn.textContent = "발급하기";
+      });
+  });
+
+  /* 다음 액자 번호 */
+  function nextCode(){
+    return sb.from("frames").select("code").order("code", { ascending: false }).limit(1)
+      .then(function(r){
+        var n = 1;
+        if(r.data && r.data.length){
+          var mm = String(r.data[0].code).match(/(\d+)\s*$/);
+          if(mm) n = parseInt(mm[1], 10) + 1;
+        }
+        return "GT-" + String(n).padStart(4, "0");
+      });
+  }
+
+  /* 계정이 없으면 만들고, 있으면 그 계정을 씁니다 */
+  function ensureUser(email, pw){
+    return sb.rpc("staff_find_user", { p_email: email }).then(function(r){
+      if(r.data) return r.data;
+      var tmp = window.supabase.createClient(SB_URL, SB_KEY);
+      return tmp.auth.signUp({ email: email, password: pw }).then(function(s){
+        if(s.error || !s.data || !s.data.user){
+          throw new Error("계정을 만들지 못했습니다. 이미 있는 이메일인지 확인해주세요");
+        }
+        return s.data.user.id;
+      });
+    });
+  }
+
+  function show(frame, email, pw){
+    var admin = BASE + "index.html";
+    var fr    = BASE + "frame.html?t=" + frame.token;
+    $("rCode").textContent  = frame.code;
+    $("rAdmin").textContent = admin;
+    $("rFrame").textContent = fr;
+    $("rGuide").textContent =
+      "감탄사진관 액자 안내\n\n" +
+      "아래 주소로 들어가셔서 사진을 넣어주세요.\n" + admin + "\n\n" +
+      "아이디: " + email + "\n" +
+      "비밀번호: " + pw + "\n\n" +
+      "액자 번호: " + frame.code + "\n" +
+      "처음 들어가시면 '내 이름'을 먼저 정해주세요. 부모님 액자에 그 이름으로 표시됩니다.";
+    $("result").hidden = false;
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* 복사 */
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("[data-copy]");
+    if(!b) return;
+    var txt = $(b.dataset.copy).textContent;
+    navigator.clipboard.writeText(txt).then(function(){
+      var old = b.textContent; b.textContent = "복사됨";
+      setTimeout(function(){ b.textContent = old; }, 1400);
+    }, function(){ b.textContent = "복사 실패"; });
+  });
+
+  /* ---------- 목록 ---------- */
+  function loadList(){
+    sb.from("frames").select("code, label, last_seen_at").order("code", { ascending: false })
+      .then(function(r){
+        var rows = $("rows"); rows.innerHTML = "";
+        var list = r.data || [];
+        $("listSub").textContent = list.length ? "모두 " + list.length + "대" : "아직 발급한 액자가 없습니다";
+        list.forEach(function(f){
+          var tr = document.createElement("tr");
+          var a = document.createElement("td");
+          a.innerHTML = '<span class="mono">' + f.code + '</span>';
+          var b = document.createElement("td");
+          b.textContent = f.label || "—";
+          if(!f.label) b.className = "dim";
+          var c = document.createElement("td");
+          c.textContent = ago(f.last_seen_at);
+          c.className = "dim";
+          tr.appendChild(a); tr.appendChild(b); tr.appendChild(c);
+          rows.appendChild(tr);
+        });
+      });
+  }
+
+  function ago(t){
+    if(!t) return "연결 전";
+    var m = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
+    if(m < 1)    return "방금";
+    if(m < 60)   return m + "분 전";
+    if(m < 1440) return Math.floor(m/60) + "시간 전";
+    return Math.floor(m/1440) + "일 전";
+  }
+})();
+</script>
+</body>
+</html>

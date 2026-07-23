@@ -247,9 +247,13 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
     btn.disabled = true; btn.textContent = "발급 중…";
     m.textContent = "";
 
-    var frame = null;
+    var frame = null, uid = null;
 
-    nextCode()
+    ensureUser(email, pw)
+      .then(function(id){
+        uid = id;
+        return nextCode();
+      })
       .then(function(code){
         return sb.from("frames").insert({ code: code, label: label || null })
                  .select("id, code, token").single();
@@ -257,9 +261,6 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
       .then(function(r){
         if(r.error) throw new Error("액자를 만들지 못했습니다");
         frame = r.data;
-        return ensureUser(email, pw);
-      })
-      .then(function(uid){
         return sb.from("frame_members")
                  .insert({ frame_id: frame.id, user_id: uid, role: "owner" });
       })
@@ -297,7 +298,14 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
   function ensureUser(email, pw){
     return sb.rpc("staff_find_user", { p_email: email }).then(function(r){
       if(r.data) return r.data;
-      var tmp = window.supabase.createClient(SB_URL, SB_KEY);
+      var tmp = window.supabase.createClient(SB_URL, SB_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: "gamtan-signup-temp"
+        }
+      });
       return tmp.auth.signUp({ email: email, password: pw }).then(function(s){
         if(s.error || !s.data || !s.data.user){
           throw new Error("계정을 만들지 못했습니다. 이미 있는 이메일인지 확인해주세요");

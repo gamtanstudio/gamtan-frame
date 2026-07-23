@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>감탄 액자 — 사진 관리</title>
+<style>
+  :root{
+    --paper:#FAF7F2; --card:#FFFFFF; --ink:#241F1A; --ink-2:#5A5148;
+    --muted:#8C8177; --brass:#9A7B45; --brass-soft:#F2EAD9;
+    --danger:#A4453A; --line:#E6DFD4; --r:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+  [hidden]{display:none !important}
+
+  /* 로그인 */
+  #login{min-height:100dvh;display:grid;place-items:center;padding:24px}
+  #login .box{width:100%;max-width:340px}
+  #login .mark{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
+  #login h1{font-size:22px;font-weight:600;margin:9px 0 4px}
+  #login p{font-size:13px;color:var(--muted);margin-bottom:22px}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:5px}
+  .field input{
+    width:100%;font:inherit;font-size:15px;padding:12px;
+    border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);
+  }
+  .field input:focus{outline:2px solid var(--brass);outline-offset:-1px;border-color:transparent}
+  .err{font-size:13px;color:var(--danger);margin:10px 0 0;min-height:20px}
+
+  /* 본문 */
+  #app{padding-bottom:104px}
+  header{padding:22px 0 14px;display:flex;align-items:flex-start;gap:12px}
+  header .t{flex:1;min-width:0}
+  .brand{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
+  header h1{font-size:21px;font-weight:600;margin-top:7px;letter-spacing:-.01em}
+  header p{font-size:13px;color:var(--muted);margin-top:3px}
+  .link{
+    background:none;border:0;font:inherit;font-size:12px;color:var(--muted);
+    cursor:pointer;text-decoration:underline;padding:4px;flex:0 0 auto;
+  }
+
+  .frame-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:18px}
+  .screen{position:relative;aspect-ratio:4/3;background:#191512;overflow:hidden}
+  .screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+  .screen .none{
+    position:absolute;inset:0;display:grid;place-items:center;
+    color:#7a6f63;font-size:13px;text-align:center;padding:20px;line-height:1.7;
+  }
+  .screen .tag{
+    position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.55);
+    color:#fff;font-size:11px;padding:4px 9px;border-radius:99px;
+  }
+  .frame-meta{display:flex;align-items:center;gap:10px;padding:12px 14px}
+  .dot{width:7px;height:7px;border-radius:50%;background:#4C9A5A;flex:0 0 auto}
+  .dot.cold{background:#C9A227}
+  .dot.off{background:#B7ADA1}
+  .frame-meta .txt{flex:1;min-width:0}
+  .frame-meta b{display:block;font-size:14px;font-weight:600}
+  .frame-meta span{font-size:12px;color:var(--muted)}
+  .code{
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+    background:var(--brass-soft);color:#6B5327;padding:5px 9px;border-radius:6px;letter-spacing:.06em;
+  }
+
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:24px 0 10px}
+  .sec-head h2{font-size:15px;font-weight:600}
+  .sec-head .count{font-size:12px;color:var(--muted)}
+  .sec-head .count.warn{color:var(--danger);font-weight:600}
+
+  #list{display:flex;flex-direction:column;gap:8px}
+  .row{
+    display:flex;align-items:center;gap:11px;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--r);padding:8px;
+    transition:opacity .2s,transform .2s;
+  }
+  .row.going{opacity:0;transform:scale(.97)}
+  .thumb{width:60px;height:46px;object-fit:cover;border-radius:6px;background:#EDE7DD;flex:0 0 auto}
+  .info{flex:1;min-width:0}
+  .info b{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info span{font-size:11px;color:var(--muted)}
+  .row-btns{display:flex;gap:3px;flex:0 0 auto}
+  .ib{
+    width:32px;height:32px;border:1px solid var(--line);background:var(--card);
+    border-radius:7px;color:var(--ink-2);cursor:pointer;font-size:14px;
+    display:grid;place-items:center;font-family:inherit;
+  }
+  .ib:disabled{opacity:.3;cursor:default}
+  .ib.del{color:var(--danger)}
+  .ib:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:34px 20px;text-align:center}
+  .empty b{display:block;font-size:14px;font-weight:500;margin-bottom:5px}
+  .empty span{font-size:13px;color:var(--muted)}
+
+  .setting{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;
+  }
+  .setting .label{flex:1;min-width:140px}
+  .setting .label b{display:block;font-size:13px;font-weight:500}
+  .setting .label span{font-size:12px;color:var(--muted)}
+  select,input[type=time],.setting input[type=text]{
+    font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);
+    border-radius:7px;background:var(--card);color:var(--ink);
+  }
+  .setting input[type=text]{width:130px}
+
+  #bar{
+    position:fixed;left:0;right:0;bottom:0;background:rgba(250,247,242,.94);
+    backdrop-filter:blur(10px);border-top:1px solid var(--line);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  #bar .wrap{padding:0}
+  .primary{
+    width:100%;background:var(--ink);color:var(--paper);border:0;border-radius:9px;
+    font:inherit;font-size:15px;font-weight:600;padding:14px;cursor:pointer;
+  }
+  .primary:disabled{background:var(--muted);cursor:default}
+  .primary:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  #hint{font-size:11.5px;color:var(--muted);text-align:center;margin-top:7px}
+  input[type=file]{display:none}
+
+  #toast{
+    position:fixed;left:50%;bottom:96px;transform:translate(-50%,14px);
+    background:var(--ink);color:var(--paper);font-size:13px;padding:10px 16px;
+    border-radius:99px;opacity:0;pointer-events:none;
+    transition:opacity .25s,transform .25s;z-index:9;max-width:88vw;text-align:center;
+  }
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+  #boot{min-height:100dvh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+</style>
+</head>
+<body>
+
+<div id="boot">불러오는 중…</div>
+
+<!-- 로그인 -->
+<div id="login" hidden>
+  <div class="box">
+    <div class="mark">Gamtan</div>
+    <h1>사진 관리</h1>
+    <p>부모님 액자에 사진을 넣으려면 로그인하세요</p>
+    <div class="field">
+      <label for="email">이메일</label>
+      <input id="email" type="email" autocomplete="username" inputmode="email">
+    </div>
+    <div class="field">
+      <label for="pw">비밀번호</label>
+      <input id="pw" type="password" autocomplete="current-password">
+    </div>
+    <p class="err" id="loginErr"></p>
+    <button class="primary" id="signin" style="margin-top:6px">로그인</button>
+  </div>
+</div>
+
+<!-- 본문 -->
+<div id="app" hidden>
+  <div class="wrap">
+    <header>
+      <div class="t">
+        <div class="brand">Gamtan</div>
+        <h1 id="frameLabel">부모님 액자</h1>
+        <p>여기에 올린 사진이 부모님 댁 액자에 뜹니다</p>
+      </div>
+      <button class="link" id="signout">로그아웃</button>
+    </header>
+
+    <div class="frame-card">
+      <div class="screen">
+        <div class="none" id="screenNone">아직 사진이 없습니다<br>아래에서 사진을 올려주세요</div>
+        <img id="screenImg" alt="" hidden>
+        <div class="tag" id="screenTag" hidden></div>
+      </div>
+      <div class="frame-meta">
+        <span class="dot" id="dot"></span>
+        <span class="txt">
+          <b id="statusTitle">확인 중</b>
+          <span id="seen">액자 상태를 확인하고 있습니다</span>
+        </span>
+        <span class="code" id="fcode">—</span>
+      </div>
+    </div>
+
+    <div class="sec-head">
+      <h2>올린 사진</h2>
+      <span class="count" id="count">0장</span>
+    </div>
+    <div id="list"></div>
+
+    <div class="sec-head"><h2>액자 설정</h2></div>
+
+    <div class="setting">
+      <span class="label"><b>내 이름</b><span>부모님께 이렇게 표시됩니다</span></span>
+      <input type="text" id="myname" placeholder="예: 막내" maxlength="12">
+    </div>
+
+    <div class="setting">
+      <span class="label"><b>사진 넘김</b><span>한 장이 머무는 시간</span></span>
+      <select id="interval">
+        <option value="10">10초</option>
+        <option value="30">30초</option>
+        <option value="60">1분</option>
+        <option value="300">5분</option>
+      </select>
+    </div>
+
+    <div class="setting">
+      <span class="label"><b>세로 사진</b><span>두 장씩 나란히 놓기</span></span>
+      <select id="pairSel">
+        <option value="1">나란히</option>
+        <option value="0">한 장씩</option>
+      </select>
+    </div>
+
+    <div class="setting">
+      <span class="label"><b>밤에 끄기</b><span>이 시간엔 화면이 꺼집니다</span></span>
+      <input type="time" id="sleepFrom">
+      <span style="color:var(--muted);font-size:13px">–</span>
+      <input type="time" id="sleepTo">
+    </div>
+  </div>
+
+  <div id="bar">
+    <div class="wrap">
+      <button class="primary" id="add">사진 올리기</button>
+      <div id="hint">한 번에 여러 장 고를 수 있어요 · 최대 150장</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="file" multiple accept="image/*">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   ▼▼▼ 여기 두 줄만 GTman님 값으로 바꾸세요 ▼▼▼
+
+   수파베이스 → Settings → API 에서 찾을 수 있습니다.
+   - Project URL      → SB_URL
+   - anon / public 키  → SB_KEY   (service_role 키는 절대 아님)
+   ═══════════════════════════════════════════════════════════ */
+var SB_URL = "https://sdjhvtljrzkvniwdtwir.supabase.co";
+var SB_KEY = "sb_publishable_qoIwl7-UfHB2L3LsqnCu-g_t-_6B53R";
+/* ═══════════════════════════════════════════════════════════ */
+
+var BUCKET = "frame-photos";
+var MAX = 150, LONG_EDGE = 1920, QUALITY = 0.82;
+
+(function(){
+  "use strict";
+
+  var sb = window.supabase.createClient(SB_URL, SB_KEY);
+  var frame = null, member = null, photos = [];
+
+  var $ = function(id){ return document.getElementById(id); };
+  var boot = $("boot"), loginBox = $("login"), app = $("app");
+  var listEl = $("list"), countEl = $("count"), fileEl = $("file"), addBtn = $("add");
+  var sImg = $("screenImg"), sNone = $("screenNone"), sTag = $("screenTag");
+
+  /* ---------- 알림 ---------- */
+  var tt;
+  function toast(msg){
+    var t = $("toast");
+    t.textContent = msg; t.classList.add("on");
+    clearTimeout(tt); tt = setTimeout(function(){ t.classList.remove("on"); }, 2600);
+  }
+
+  /* ---------- 로그인 ---------- */
+  $("signin").addEventListener("click", signIn);
+  $("pw").addEventListener("keydown", function(e){ if(e.key === "Enter") signIn(); });
+
+  function signIn(){
+    var btn = $("signin"), err = $("loginErr");
+    err.textContent = ""; btn.disabled = true; btn.textContent = "로그인 중…";
+    sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pw").value })
+      .then(function(r){
+        btn.disabled = false; btn.textContent = "로그인";
+        if(r.error){ err.textContent = "이메일이나 비밀번호를 다시 확인해주세요"; return; }
+        start();
+      });
+  }
+
+  $("signout").addEventListener("click", function(){
+    sb.auth.signOut().then(function(){ location.reload(); });
+  });
+
+  /* ---------- 시작 ---------- */
+  sb.auth.getSession().then(function(r){
+    if(r.data && r.data.session) start();
+    else { boot.hidden = true; loginBox.hidden = false; }
+  });
+
+  function start(){
+    boot.hidden = false; loginBox.hidden = true; app.hidden = true;
+    boot.textContent = "액자를 찾는 중…";
+
+    sb.from("frame_members").select("frame_id, user_id, display_name, frames(*)").limit(1)
+      .then(function(r){
+        if(r.error || !r.data || !r.data.length){
+          boot.textContent = "연결된 액자가 없습니다. 사진관에 문의해주세요.";
+          return;
+        }
+        member = r.data[0];
+        frame = member.frames;
+        fillFrame();
+        return loadPhotos().then(function(){
+          boot.hidden = true; app.hidden = false;
+        });
+      });
+  }
+
+  function fillFrame(){
+    $("fcode").textContent = frame.code;
+    if(frame.label) $("frameLabel").textContent = frame.label;
+    $("interval").value = String(frame.interval_sec);
+    $("pairSel").value = frame.pair_portrait ? "1" : "0";
+    $("sleepFrom").value = (frame.sleep_from || "22:00:00").slice(0,5);
+    $("sleepTo").value   = (frame.sleep_to   || "07:00:00").slice(0,5);
+    $("myname").value = member.display_name || "";
+    paintStatus();
+  }
+
+  /* ---------- 액자 상태 ---------- */
+  function paintStatus(){
+    var dot = $("dot"), title = $("statusTitle"), seen = $("seen");
+    if(!frame.last_seen_at){
+      dot.className = "dot off";
+      title.textContent = "아직 연결 전";
+      seen.textContent = "액자 전원을 켜면 여기에 표시됩니다";
+      return;
+    }
+    var mins = Math.floor((Date.now() - new Date(frame.last_seen_at).getTime()) / 60000);
+    if(mins < 30){
+      dot.className = "dot";
+      title.textContent = "연결됨";
+      seen.textContent = mins < 1 ? "방금 액자가 확인했습니다" : mins + "분 전에 액자가 확인했습니다";
+    }else if(mins < 60 * 24){
+      dot.className = "dot cold";
+      title.textContent = "잠시 끊김";
+      seen.textContent = Math.floor(mins/60) + "시간 전에 마지막으로 확인했습니다";
+    }else{
+      dot.className = "dot off";
+      title.textContent = "연결 안 됨";
+      seen.textContent = Math.floor(mins/1440) + "일 전에 마지막으로 확인했습니다";
+    }
+  }
+
+  setInterval(function(){
+    if(!frame) return;
+    sb.from("frames").select("last_seen_at").eq("id", frame.id).single()
+      .then(function(r){
+        if(r.data){ frame.last_seen_at = r.data.last_seen_at; paintStatus(); }
+      });
+  }, 60000);
+
+  /* ---------- 사진 목록 ---------- */
+  function publicUrl(path){
+    return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+
+  function loadPhotos(){
+    return sb.from("photos").select("*").eq("frame_id", frame.id)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true })
+      .then(function(r){
+        photos = (r.data || []);
+        render();
+      });
+  }
+
+  function render(){
+    listEl.innerHTML = "";
+    if(!photos.length){
+      var e = document.createElement("div");
+      e.className = "empty";
+      e.innerHTML = "<b>아직 올린 사진이 없습니다</b><span>사진을 올리면 부모님 액자에 곧 뜹니다</span>";
+      listEl.appendChild(e);
+    }
+
+    photos.forEach(function(p, i){
+      var row = document.createElement("div"); row.className = "row";
+
+      var t = document.createElement("img");
+      t.className = "thumb"; t.src = publicUrl(p.path); t.alt = ""; t.loading = "lazy";
+      row.appendChild(t);
+
+      var info = document.createElement("div"); info.className = "info";
+      var b = document.createElement("b"); b.textContent = p.name || "사진";
+      var s = document.createElement("span");
+      s.textContent = (i+1) + "번째 · " + Math.round((p.bytes||0)/1024) + " KB"
+        + (p.uploaded_by ? " · " + p.uploaded_by : "");
+      info.appendChild(b); info.appendChild(s); row.appendChild(info);
+
+      var btns = document.createElement("div"); btns.className = "row-btns";
+
+      var up = document.createElement("button");
+      up.className = "ib"; up.textContent = "↑"; up.disabled = (i === 0);
+      up.setAttribute("aria-label","앞으로 옮기기");
+      up.addEventListener("click", function(){ swap(i, i-1); });
+
+      var dn = document.createElement("button");
+      dn.className = "ib"; dn.textContent = "↓"; dn.disabled = (i === photos.length-1);
+      dn.setAttribute("aria-label","뒤로 옮기기");
+      dn.addEventListener("click", function(){ swap(i, i+1); });
+
+      var del = document.createElement("button");
+      del.className = "ib del"; del.textContent = "×";
+      del.setAttribute("aria-label","지우기");
+      del.addEventListener("click", function(){ removePhoto(p, row); });
+
+      btns.appendChild(up); btns.appendChild(dn); btns.appendChild(del);
+      row.appendChild(btns);
+      listEl.appendChild(row);
+    });
+
+    countEl.textContent = photos.length + "장 / " + MAX + "장";
+    countEl.classList.toggle("warn", photos.length >= MAX - 10);
+    paintScreen();
+  }
+
+  /* ---------- 순서 ---------- */
+  function swap(a, b){
+    var pa = photos[a], pb = photos[b];
+    var posA = pa.position, posB = pb.position;
+    if(posA === posB){ posA = a; posB = b; }
+    Promise.all([
+      sb.from("photos").update({ position: posB }).eq("id", pa.id),
+      sb.from("photos").update({ position: posA }).eq("id", pb.id)
+    ]).then(loadPhotos);
+  }
+
+  /* ---------- 지우기 ---------- */
+  function removePhoto(p, row){
+    row.classList.add("going");
+    sb.storage.from(BUCKET).remove([p.path])
+      .then(function(){ return sb.from("photos").delete().eq("id", p.id); })
+      .then(function(r){
+        if(r.error){ toast("지우지 못했습니다"); row.classList.remove("going"); return; }
+        return loadPhotos().then(function(){ toast("지웠습니다"); });
+      });
+  }
+
+  /* ---------- 줄이기 ---------- */
+  function shrink(file){
+    return new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onerror = function(){ reject(new Error("read")); };
+      fr.onload = function(){
+        var img = new Image();
+        img.onerror = function(){ reject(new Error("decode")); };
+        img.onload = function(){
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var s = Math.min(1, LONG_EDGE / Math.max(w, h));
+          var cw = Math.round(w*s), ch = Math.round(h*s);
+          var cv = document.createElement("canvas");
+          cv.width = cw; cv.height = ch;
+          cv.getContext("2d").drawImage(img, 0, 0, cw, ch);
+          cv.toBlob(function(blob){
+            blob ? resolve(blob) : reject(new Error("encode"));
+          }, "image/jpeg", QUALITY);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* ---------- 올리기 ---------- */
+  addBtn.addEventListener("click", function(){
+    if(!$("myname").value.trim()){
+      toast("먼저 아래 '내 이름'을 정해주세요");
+      $("myname").focus();
+      return;
+    }
+    fileEl.click();
+  });
+
+  fileEl.addEventListener("change", function(){
+    var picked = Array.prototype.slice.call(fileEl.files || [])
+      .filter(function(f){ return /^image\//.test(f.type); });
+    fileEl.value = "";
+    if(!picked.length) return;
+
+    var room = MAX - photos.length;
+    if(room <= 0){ toast("150장이 꽉 찼습니다. 먼저 지워주세요"); return; }
+    var over = picked.length - room;
+    if(over > 0) picked = picked.slice(0, room);
+
+    var who = $("myname").value.trim();
+    var basePos = photos.length ? Math.max.apply(null, photos.map(function(p){ return p.position||0; })) : 0;
+
+    addBtn.disabled = true;
+    var ok = 0, bad = 0;
+
+    function step(i){
+      if(i >= picked.length){
+        addBtn.disabled = false; addBtn.textContent = "사진 올리기";
+        loadPhotos().then(function(){
+          var m = ok + "장 올렸습니다";
+          if(over > 0) m += " · " + over + "장은 자리가 없어 못 올렸어요";
+          if(bad > 0)  m += " · " + bad + "장 실패";
+          toast(m);
+        });
+        return;
+      }
+      addBtn.textContent = "올리는 중 " + (i+1) + " / " + picked.length;
+
+      var f = picked[i];
+      shrink(f).then(function(blob){
+        var path = frame.id + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,9) + ".jpg";
+        return sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" })
+          .then(function(r){
+            if(r.error) throw r.error;
+            return sb.from("photos").insert({
+              frame_id: frame.id,
+              path: path,
+              name: f.name.replace(/\.[^.]+$/, ""),
+              position: basePos + i + 1,
+              bytes: blob.size,
+              uploaded_by: who
+            });
+          })
+          .then(function(r){ if(r.error) throw r.error; ok++; });
+      }).catch(function(){ bad++; })
+        .then(function(){ step(i+1); });
+    }
+    step(0);
+  });
+
+  /* ---------- 미리보기 ---------- */
+  var pi = 0, ptimer = null;
+  function paintScreen(){
+    clearInterval(ptimer);
+    if(!photos.length){
+      sImg.hidden = true; sTag.hidden = true; sNone.hidden = false; return;
+    }
+    sNone.hidden = true; sImg.hidden = false; sTag.hidden = false;
+    if(pi >= photos.length) pi = 0;
+    showOne();
+    ptimer = setInterval(function(){ pi = (pi+1) % photos.length; showOne(); }, 4000);
+  }
+  function showOne(){
+    var p = photos[pi];
+    sImg.src = publicUrl(p.path);
+    sTag.textContent = (p.uploaded_by || "가족") + "이(가) 보냈어요";
+  }
+
+  /* ---------- 설정 저장 ---------- */
+  function saveFrame(patch){
+    Object.assign(frame, patch);
+    sb.from("frames").update(patch).eq("id", frame.id).then(function(r){
+      toast(r.error ? "저장하지 못했습니다" : "액자에 반영됩니다");
+    });
+  }
+
+  $("interval").addEventListener("change", function(){ saveFrame({ interval_sec: +this.value }); });
+  $("pairSel").addEventListener("change", function(){ saveFrame({ pair_portrait: this.value === "1" }); });
+  $("sleepFrom").addEventListener("change", saveSleep);
+  $("sleepTo").addEventListener("change", saveSleep);
+  function saveSleep(){
+    saveFrame({ sleep_from: $("sleepFrom").value, sleep_to: $("sleepTo").value });
+  }
+
+  $("myname").addEventListener("change", function(){
+    var v = this.value.trim();
+    if(!v) return;
+    member.display_name = v;
+    sb.from("frame_members").update({ display_name: v })
+      .eq("frame_id", frame.id).eq("user_id", member.user_id || undefined)
+      .then(function(){ toast("이름을 저장했습니다"); });
+  });
+})();
+</script>
+</body>
+</html>

@@ -20,7 +20,7 @@ font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-
 }
 #stage{position:fixed;top:0;right:0;bottom:0;left:0;overflow:hidden;background:#000}
 
-.slot{position:absolute;top:0;right:0;bottom:0;left:0;opacity:0;-webkit-transition:opacity 1.2s ease;transition:opacity 1.2s ease}
+.slot{position:absolute;top:0;right:0;bottom:0;left:0;opacity:0;-webkit-transition:opacity 2.5s ease-in-out;transition:opacity 2.5s ease-in-out}
 .slot.on{opacity:1}
 .panes{position:absolute;top:0;right:0;bottom:0;left:0;display:-webkit-box;display:-webkit-flex;display:flex}
 .pane{position:relative;-webkit-box-flex:1;-webkit-flex:1;flex:1;overflow:hidden}
@@ -163,7 +163,7 @@ function getParam(name){
   return null;
 }
 
-var conf = { interval_sec:30, pair_portrait:true, sleep_from:null, sleep_to:null, code:"—" };
+var conf = { interval_sec:30, name_mode:"brief", sleep_from:null, sleep_to:null, code:"—" };
 var photos = [], slides = [], idx = -1, useA = true;
 var timer = null, lastSync = null, lastKey = "", failCount = 0;
 
@@ -225,7 +225,7 @@ lastSync = new Date();
 
 conf.code = d.code;
 conf.interval_sec = d.interval_sec || 30;
-conf.pair_portrait = d.pair_portrait !== false;
+conf.name_mode = d.name_mode || "brief";
 conf.sleep_from = d.sleep_from;
 conf.sleep_to = d.sleep_to;
 
@@ -274,14 +274,7 @@ for(var i = 0; i < list.length; i++){
 
 function build(){
 slides = [];
-var i = 0;
-while(i < photos.length){
-  if(conf.pair_portrait && photos[i].portrait && photos[i+1] && photos[i+1].portrait){
-    slides.push([photos[i], photos[i+1]]); i += 2;
-  }else{
-    slides.push([photos[i]]); i += 1;
-  }
-}
+for(var i = 0; i < photos.length; i++){ slides.push([photos[i]]); }
 }
 
 /* ---------- 넘기기 ---------- */
@@ -301,6 +294,7 @@ for(var g = 0; g < group.length; g++){
   var bg = document.createElement("div"); bg.className = "bg";
   bg.style.backgroundImage = 'url("' + p.url + '")';
   var im = document.createElement("img"); im.src = p.url; im.alt = "";
+  im.style.objectFit = p.portrait ? "cover" : "contain";
   pane.appendChild(bg); pane.appendChild(im);
   panes.appendChild(pane);
 }
@@ -313,11 +307,15 @@ for(var n = 0; n < group.length; n++){
   var by = group[n].by;
   if(by && names.indexOf(by) < 0) names.push(by);
 }
-if(names.length){
+if(conf.name_mode !== "off" && names.length){
   sender.className = "";
   senderText.textContent = names.join(", ") + "이(가) 보냈어요";
   setTimeout(function(){ sender.className = "on"; }, 400);
-  setTimeout(function(){ sender.className = ""; }, 6000);
+  if(conf.name_mode !== "always"){
+    setTimeout(function(){ sender.className = ""; }, 6000);
+  }
+}else{
+  sender.className = "";
 }
 
 var nx = slides[(idx + 1) % slides.length];

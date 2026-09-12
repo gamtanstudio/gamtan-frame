@@ -214,10 +214,11 @@
     </div>
 
     <div class="setting">
-      <span class="label"><b>세로 사진</b><span>두 장씩 나란히 놓기</span></span>
-      <select id="pairSel">
-        <option value="1">나란히</option>
-        <option value="0">한 장씩</option>
+      <span class="label"><b>보낸 사람 이름</b><span>사진에 "○○이가 보냈어요" 표시</span></span>
+      <select id="nameSel">
+        <option value="brief">잠깐 보이기</option>
+        <option value="always">계속 보이기</option>
+        <option value="off">안 보이기</option>
       </select>
     </div>
 
@@ -232,7 +233,7 @@
   <div id="bar">
     <div class="wrap">
       <button class="primary" id="add">사진 올리기</button>
-      <div id="hint">한 번에 여러 장 고를 수 있어요 · 최대 150장</div>
+      <div id="hint">한 번에 여러 장 고를 수 있어요</div>
     </div>
   </div>
 </div>
@@ -254,7 +255,7 @@ var SB_KEY = "sb_publishable_qoIwl7-UfHB2L3LsqnCu-g_t-_6B53R";
 /* ═══════════════════════════════════════════════════════════ */
 
 var BUCKET = "frame-photos";
-var MAX = 150, LONG_EDGE = 1920, QUALITY = 0.82;
+var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
 (function(){
   "use strict";
@@ -322,8 +323,9 @@ var MAX = 150, LONG_EDGE = 1920, QUALITY = 0.82;
   function fillFrame(){
     $("fcode").textContent = frame.code;
     if(frame.label) $("frameLabel").textContent = frame.label;
+    MAX = frame.max_photos || 100;
     $("interval").value = String(frame.interval_sec);
-    $("pairSel").value = frame.pair_portrait ? "1" : "0";
+    $("nameSel").value = frame.name_mode || "brief";
     $("sleepFrom").value = (frame.sleep_from || "22:00:00").slice(0,5);
     $("sleepTo").value   = (frame.sleep_to   || "07:00:00").slice(0,5);
     $("myname").value = member.display_name || "";
@@ -492,7 +494,7 @@ var MAX = 150, LONG_EDGE = 1920, QUALITY = 0.82;
     if(!picked.length) return;
 
     var room = MAX - photos.length;
-    if(room <= 0){ toast("150장이 꽉 찼습니다. 먼저 지워주세요"); return; }
+    if(room <= 0){ toast(MAX + "장이 꽉 찼습니다. 먼저 지워주세요"); return; }
     var over = picked.length - room;
     if(over > 0) picked = picked.slice(0, room);
 
@@ -564,7 +566,7 @@ var MAX = 150, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   $("interval").addEventListener("change", function(){ saveFrame({ interval_sec: +this.value }); });
-  $("pairSel").addEventListener("change", function(){ saveFrame({ pair_portrait: this.value === "1" }); });
+  $("nameSel").addEventListener("change", function(){ saveFrame({ name_mode: this.value }); });
   $("sleepFrom").addEventListener("change", saveSleep);
   $("sleepTo").addEventListener("change", saveSleep);
   function saveSleep(){

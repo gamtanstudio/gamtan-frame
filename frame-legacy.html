@@ -20,7 +20,7 @@ font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-
 }
 #stage{position:fixed;top:0;right:0;bottom:0;left:0;overflow:hidden;background:#000}
 
-.slot{position:absolute;top:0;right:0;bottom:0;left:0;opacity:0;-webkit-transition:opacity 2.5s ease-in-out;transition:opacity 2.5s ease-in-out}
+.slot{position:absolute;top:0;right:0;bottom:0;left:0;opacity:0;-webkit-transition:opacity 1.8s ease-in-out;transition:opacity 1.8s ease-in-out}
 .slot.on{opacity:1}
 .panes{position:absolute;top:0;right:0;bottom:0;left:0;display:-webkit-box;display:-webkit-flex;display:flex}
 .pane{position:relative;-webkit-box-flex:1;-webkit-flex:1;flex:1;overflow:hidden}
@@ -163,7 +163,7 @@ function getParam(name){
   return null;
 }
 
-var conf = { interval_sec:30, name_mode:"brief", sleep_from:null, sleep_to:null, code:"—" };
+var conf = { interval_sec:30, name_mode:"brief", sleep_from:null, sleep_to:null, code:"—", message:"" };
 var photos = [], slides = [], idx = -1, useA = true;
 var timer = null, lastSync = null, lastKey = "", failCount = 0;
 
@@ -226,6 +226,7 @@ lastSync = new Date();
 conf.code = d.code;
 conf.interval_sec = d.interval_sec || 30;
 conf.name_mode = d.name_mode || "brief";
+conf.message = d.message || "";
 conf.sleep_from = d.sleep_from;
 conf.sleep_to = d.sleep_to;
 
@@ -303,13 +304,7 @@ for(var g = 0; g < group.length; g++){
 incoming.className = "slot on";
 outgoing.className = "slot";
 
-var names = [];
-for(var n = 0; n < group.length; n++){
-  var by = group[n].by;
-  if(by && names.indexOf(by) < 0) names.push(by);
-}
-var caption = (group.length === 1 && group[0].caption) ? group[0].caption : "";
-var labelText = caption ? caption : (names.length ? names.join(", ") + "이(가) 보냈어요" : "");
+var labelText = conf.message || "";
 if(conf.name_mode !== "off" && labelText){
   sender.className = "";
   senderText.textContent = labelText;

@@ -256,7 +256,7 @@ for(var i = 0; i < list.length; i++){
     var im = new Image();
     im.onload = im.onerror = function(){
       var w = im.naturalWidth || 1, h = im.naturalHeight || 1;
-      out[i] = { url:u, by:p.by, name:p.name, portrait: h > w * 1.05 };
+      out[i] = { url:u, by:p.by, name:p.name, caption:p.caption, portrait: h > w * 1.05 };
       if(--left === 0){
         photos = [];
         for(var k = 0; k < out.length; k++){ if(out[k]) photos.push(out[k]); }
@@ -294,7 +294,8 @@ for(var g = 0; g < group.length; g++){
   var bg = document.createElement("div"); bg.className = "bg";
   bg.style.backgroundImage = 'url("' + p.url + '")';
   var im = document.createElement("img"); im.src = p.url; im.alt = "";
-  im.style.objectFit = p.portrait ? "cover" : "contain";
+  var screenPortrait = (window.innerHeight >= window.innerWidth);
+  im.style.objectFit = (p.portrait === screenPortrait) ? "cover" : "contain";
   pane.appendChild(bg); pane.appendChild(im);
   panes.appendChild(pane);
 }
@@ -307,9 +308,11 @@ for(var n = 0; n < group.length; n++){
   var by = group[n].by;
   if(by && names.indexOf(by) < 0) names.push(by);
 }
-if(conf.name_mode !== "off" && names.length){
+var caption = (group.length === 1 && group[0].caption) ? group[0].caption : "";
+var labelText = caption ? caption : (names.length ? names.join(", ") + "이(가) 보냈어요" : "");
+if(conf.name_mode !== "off" && labelText){
   sender.className = "";
-  senderText.textContent = names.join(", ") + "이(가) 보냈어요";
+  senderText.textContent = labelText;
   setTimeout(function(){ sender.className = "on"; }, 400);
   if(conf.name_mode !== "always"){
     setTimeout(function(){ sender.className = ""; }, 6000);

@@ -78,8 +78,15 @@
   .row{
     display:flex;align-items:center;gap:11px;background:var(--card);
     border:1px solid var(--line);border-radius:var(--r);padding:8px;
-    transition:opacity .2s,transform .2s;
+    transition:opacity .2s,transform .2s;flex-wrap:wrap;
   }
+  .cap{
+    flex-basis:100%;width:100%;margin-top:2px;font:inherit;font-size:13px;
+    padding:8px 10px;border:1px solid var(--line);border-radius:7px;
+    background:var(--paper);color:var(--ink);
+  }
+  .cap:focus{outline:2px solid var(--brass);outline-offset:-1px;border-color:transparent}
+  .cap::placeholder{color:var(--muted)}
   .row.going{opacity:0;transform:scale(.97)}
   .thumb{width:60px;height:46px;object-fit:cover;border-radius:6px;background:#EDE7DD;flex:0 0 auto}
   .info{flex:1;min-width:0}
@@ -422,6 +429,20 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
       btns.appendChild(up); btns.appendChild(dn); btns.appendChild(del);
       row.appendChild(btns);
+
+      var cap = document.createElement("input");
+      cap.type = "text"; cap.className = "cap"; cap.maxLength = 30;
+      cap.placeholder = "메시지 (선택) — 예: 아버지 사랑해요";
+      cap.value = p.caption || "";
+      cap.addEventListener("change", function(){
+        var v = cap.value.trim();
+        p.caption = v;
+        sb.from("photos").update({ caption: v }).eq("id", p.id).then(function(r){
+          toast(r.error ? "메시지를 저장하지 못했습니다" : "메시지를 저장했습니다");
+        });
+      });
+      row.appendChild(cap);
+
       listEl.appendChild(row);
     });
 

@@ -205,9 +205,9 @@
 
     <div class="sec-head"><h2>액자 설정</h2></div>
 
-    <div class="setting">
-      <span class="label"><b>내 이름</b><span>부모님께 이렇게 표시됩니다</span></span>
-      <input type="text" id="myname" placeholder="예: 막내" maxlength="12">
+    <div class="setting" style="flex-direction:column;align-items:stretch;gap:8px">
+      <span class="label"><b>액자 메시지</b><span>부모님 액자에 함께 표시됩니다 (최대 40자)</span></span>
+      <input type="text" id="framemsg" placeholder="메시지" maxlength="40" style="width:100%">
     </div>
 
     <div class="setting">
@@ -221,7 +221,7 @@
     </div>
 
     <div class="setting">
-      <span class="label"><b>보낸 사람 이름</b><span>사진에 "○○이가 보냈어요" 표시</span></span>
+      <span class="label"><b>메시지 표시</b><span>위 메시지를 사진에 어떻게 보일지</span></span>
       <select id="nameSel">
         <option value="brief">잠깐 보이기</option>
         <option value="always">계속 보이기</option>
@@ -335,7 +335,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     $("nameSel").value = frame.name_mode || "brief";
     $("sleepFrom").value = (frame.sleep_from || "22:00:00").slice(0,5);
     $("sleepTo").value   = (frame.sleep_to   || "07:00:00").slice(0,5);
-    $("myname").value = member.display_name || "";
+    $("framemsg").value = frame.message || "";
     paintStatus();
   }
 
@@ -406,8 +406,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       var info = document.createElement("div"); info.className = "info";
       var b = document.createElement("b"); b.textContent = p.name || "사진";
       var s = document.createElement("span");
-      s.textContent = (i+1) + "번째 · " + Math.round((p.bytes||0)/1024) + " KB"
-        + (p.uploaded_by ? " · " + p.uploaded_by : "");
+      s.textContent = (i+1) + "번째 · " + Math.round((p.bytes||0)/1024) + " KB";
       info.appendChild(b); info.appendChild(s); row.appendChild(info);
 
       var btns = document.createElement("div"); btns.className = "row-btns";
@@ -429,19 +428,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
       btns.appendChild(up); btns.appendChild(dn); btns.appendChild(del);
       row.appendChild(btns);
-
-      var cap = document.createElement("input");
-      cap.type = "text"; cap.className = "cap"; cap.maxLength = 30;
-      cap.placeholder = "메시지 (선택) — 예: 아버지 사랑해요";
-      cap.value = p.caption || "";
-      cap.addEventListener("change", function(){
-        var v = cap.value.trim();
-        p.caption = v;
-        sb.from("photos").update({ caption: v }).eq("id", p.id).then(function(r){
-          toast(r.error ? "메시지를 저장하지 못했습니다" : "메시지를 저장했습니다");
-        });
-      });
-      row.appendChild(cap);
 
       listEl.appendChild(row);
     });
@@ -500,11 +486,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
   /* ---------- 올리기 ---------- */
   addBtn.addEventListener("click", function(){
-    if(!$("myname").value.trim()){
-      toast("먼저 아래 '내 이름'을 정해주세요");
-      $("myname").focus();
-      return;
-    }
     fileEl.click();
   });
 
@@ -519,7 +500,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     var over = picked.length - room;
     if(over > 0) picked = picked.slice(0, room);
 
-    var who = $("myname").value.trim();
     var basePos = photos.length ? Math.max.apply(null, photos.map(function(p){ return p.position||0; })) : 0;
 
     addBtn.disabled = true;
@@ -549,8 +529,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
               path: path,
               name: f.name.replace(/\.[^.]+$/, ""),
               position: basePos + i + 1,
-              bytes: blob.size,
-              uploaded_by: who
+              bytes: blob.size
             });
           })
           .then(function(r){ if(r.error) throw r.error; ok++; });
@@ -575,7 +554,9 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   function showOne(){
     var p = photos[pi];
     sImg.src = publicUrl(p.path);
-    sTag.textContent = (p.uploaded_by || "가족") + "이(가) 보냈어요";
+    var m = (frame.message || "").trim();
+    sTag.hidden = !m;
+    sTag.textContent = m;
   }
 
   /* ---------- 설정 저장 ---------- */
@@ -594,13 +575,10 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     saveFrame({ sleep_from: $("sleepFrom").value, sleep_to: $("sleepTo").value });
   }
 
-  $("myname").addEventListener("change", function(){
-    var v = this.value.trim();
-    if(!v) return;
-    member.display_name = v;
-    sb.from("frame_members").update({ display_name: v })
-      .eq("frame_id", frame.id).eq("user_id", member.user_id || undefined)
-      .then(function(){ toast("이름을 저장했습니다"); });
+  $("framemsg").addEventListener("change", function(){
+    var v = this.value.trim().slice(0, 40);
+    saveFrame({ message: v });
+    if(frame) paintScreen();
   });
 })();
 </script>

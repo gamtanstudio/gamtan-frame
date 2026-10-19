@@ -296,7 +296,7 @@ for(var g = 0; g < group.length; g++){
   bg.style.backgroundImage = 'url("' + p.url + '")';
   var im = document.createElement("img"); im.src = p.url; im.alt = "";
   var screenPortrait = (window.innerHeight >= window.innerWidth);
-  im.style.objectFit = (p.portrait === screenPortrait) ? "cover" : "contain";
+  im.style.objectFit = "cover";
   pane.appendChild(bg); pane.appendChild(im);
   panes.appendChild(pane);
 }

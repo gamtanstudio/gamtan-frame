@@ -143,6 +143,34 @@
   #toast.on{opacity:1;transform:translate(-50%,0)}
   #boot{min-height:100dvh;display:grid;place-items:center;color:var(--muted);font-size:14px}
 
+  /* 선택/관리 바 */
+  #selbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+  #selbar .sp{flex:1;min-width:0}
+  .selchk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer}
+  .selchk input{width:16px;height:16px;accent-color:var(--brass)}
+  .tbtn{
+    background:var(--card);border:1px solid var(--line);border-radius:7px;
+    font:inherit;font-size:12.5px;color:var(--ink-2);padding:7px 11px;cursor:pointer;
+  }
+  .tbtn:disabled{opacity:.4;cursor:default}
+  .tbtn.danger{color:var(--danger);border-color:#E7C9C4}
+  .tbtn:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+
+  .rowchk{width:18px;height:18px;flex:0 0 auto;accent-color:var(--brass)}
+  .row.sel{border-color:var(--brass);background:var(--brass-soft)}
+
+  /* 드래그 오버레이 (PC) */
+  #drop{
+    position:fixed;inset:0;z-index:20;display:none;place-items:center;
+    background:rgba(36,31,26,.55);color:#fff;font-size:16px;
+    pointer-events:none;padding:24px;text-align:center;
+  }
+  body.dragging #drop{display:grid}
+
+  /* 자동 보정 토글 */
+  .enh{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--ink-2);margin-top:9px;cursor:pointer}
+  .enh input{width:16px;height:16px;accent-color:var(--brass)}
+
   @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
 </style>
 </head>
@@ -201,14 +229,18 @@
       <h2>올린 사진</h2>
       <span class="count" id="count">0장</span>
     </div>
+
+    <div id="selbar" hidden>
+      <label class="selchk"><input type="checkbox" id="selAll">전체 선택</label>
+      <span class="sp"></span>
+      <button class="tbtn" id="shuffle">순서 섞기</button>
+      <button class="tbtn danger" id="selDel" disabled>선택 삭제</button>
+      <button class="tbtn danger" id="clearAll">전체 삭제</button>
+    </div>
+
     <div id="list"></div>
 
     <div class="sec-head"><h2>액자 설정</h2></div>
-
-    <div class="setting" style="flex-direction:column;align-items:stretch;gap:8px">
-      <span class="label"><b>액자 메시지</b><span>부모님 액자에 함께 표시됩니다 (최대 40자)</span></span>
-      <input type="text" id="framemsg" placeholder="메시지" maxlength="40" style="width:100%">
-    </div>
 
     <div class="setting">
       <span class="label"><b>사진 넘김</b><span>한 장이 머무는 시간</span></span>
@@ -217,15 +249,6 @@
         <option value="30">30초</option>
         <option value="60">1분</option>
         <option value="300">5분</option>
-      </select>
-    </div>
-
-    <div class="setting">
-      <span class="label"><b>메시지 표시</b><span>위 메시지를 사진에 어떻게 보일지</span></span>
-      <select id="nameSel">
-        <option value="brief">잠깐 보이기</option>
-        <option value="always">계속 보이기</option>
-        <option value="off">안 보이기</option>
       </select>
     </div>
 
@@ -240,12 +263,14 @@
   <div id="bar">
     <div class="wrap">
       <button class="primary" id="add">사진 올리기</button>
-      <div id="hint">한 번에 여러 장 고를 수 있어요</div>
+      <label class="enh"><input type="checkbox" id="autoEnh" checked>올릴 때 사진 자동 보정</label>
+      <div id="hint">눌러서 고르세요 · 여러 장 가능 · PC는 끌어다 놔도 됩니다</div>
     </div>
   </div>
 </div>
 
 <div id="toast"></div>
+<div id="drop">여기에 사진을 놓으세요</div>
 <input type="file" id="file" multiple accept="image/*">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -268,9 +293,10 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   "use strict";
 
   var sb = window.supabase.createClient(SB_URL, SB_KEY);
-  var frame = null, member = null, photos = [];
+  var frame = null, member = null, photos = [], selected = {};
 
   var $ = function(id){ return document.getElementById(id); };
+  function pid(p){ return String(p.id); }
   var boot = $("boot"), loginBox = $("login"), app = $("app");
   var listEl = $("list"), countEl = $("count"), fileEl = $("file"), addBtn = $("add");
   var sImg = $("screenImg"), sNone = $("screenNone"), sTag = $("screenTag");
@@ -332,10 +358,8 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     if(frame.label) $("frameLabel").textContent = frame.label;
     MAX = frame.max_photos || 100;
     $("interval").value = String(frame.interval_sec);
-    $("nameSel").value = frame.name_mode || "brief";
     $("sleepFrom").value = (frame.sleep_from || "22:00:00").slice(0,5);
     $("sleepTo").value   = (frame.sleep_to   || "07:00:00").slice(0,5);
-    $("framemsg").value = frame.message || "";
     paintStatus();
   }
 
@@ -398,6 +422,17 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
     photos.forEach(function(p, i){
       var row = document.createElement("div"); row.className = "row";
+      if(selected[pid(p)]) row.classList.add("sel");
+
+      var chk = document.createElement("input");
+      chk.type = "checkbox"; chk.className = "rowchk"; chk.checked = !!selected[pid(p)];
+      chk.setAttribute("aria-label","선택");
+      chk.addEventListener("change", function(){
+        if(chk.checked) selected[pid(p)] = true; else delete selected[pid(p)];
+        row.classList.toggle("sel", chk.checked);
+        updateSelBar();
+      });
+      row.appendChild(chk);
 
       var t = document.createElement("img");
       t.className = "thumb"; t.src = publicUrl(p.path); t.alt = ""; t.loading = "lazy";
@@ -434,7 +469,21 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
     countEl.textContent = photos.length + "장 / " + MAX + "장";
     countEl.classList.toggle("warn", photos.length >= MAX - 10);
+    $("selbar").hidden = !photos.length;
+    updateSelBar();
     paintScreen();
+  }
+
+  function updateSelBar(){
+    var valid = {};
+    photos.forEach(function(p){ if(selected[pid(p)]) valid[pid(p)] = true; });
+    selected = valid;
+    var n = 0; for(var k in selected) n++;
+    var selDel = $("selDel");
+    selDel.disabled = (n === 0);
+    selDel.textContent = n ? ("선택 삭제 " + n) : "선택 삭제";
+    $("selAll").checked = (photos.length > 0 && n === photos.length);
+    $("shuffle").disabled = (photos.length < 2);
   }
 
   /* ---------- 순서 ---------- */
@@ -458,6 +507,60 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
         return loadPhotos().then(function(){ toast("지웠습니다"); });
       });
   }
+
+  /* ---------- 선택 삭제 / 전체 삭제 ---------- */
+  function deletePhotos(delList, doneMsg){
+    if(!delList.length) return;
+    var paths = delList.map(function(p){ return p.path; });
+    var ids   = delList.map(function(p){ return p.id; });
+    $("selDel").disabled = true; $("clearAll").disabled = true;
+    sb.storage.from(BUCKET).remove(paths)
+      .then(function(){ return sb.from("photos").delete().in("id", ids); })
+      .then(function(r){
+        $("clearAll").disabled = false;
+        if(r.error){ toast("지우지 못했습니다"); updateSelBar(); return; }
+        selected = {};
+        return loadPhotos().then(function(){ toast(doneMsg); });
+      });
+  }
+
+  $("selDel").addEventListener("click", function(){
+    var sel = photos.filter(function(p){ return selected[pid(p)]; });
+    if(!sel.length) return;
+    if(!confirm(sel.length + "장을 지울까요? 되돌릴 수 없습니다.")) return;
+    deletePhotos(sel, sel.length + "장 지웠습니다");
+  });
+
+  $("clearAll").addEventListener("click", function(){
+    if(!photos.length) return;
+    if(!confirm("사진 " + photos.length + "장을 모두 지울까요? 되돌릴 수 없습니다.")) return;
+    deletePhotos(photos.slice(), "모두 지웠습니다");
+  });
+
+  $("selAll").addEventListener("change", function(){
+    var on = this.checked;
+    selected = {};
+    if(on) photos.forEach(function(p){ selected[pid(p)] = true; });
+    render();
+  });
+
+  /* ---------- 순서 섞기 ---------- */
+  $("shuffle").addEventListener("click", function(){
+    if(photos.length < 2) return;
+    var order = photos.map(function(p){ return p.id; });
+    for(var i=order.length-1; i>0; i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    var btn = this, prev = btn.textContent;
+    btn.disabled = true; btn.textContent = "섞는 중…";
+    Promise.all(order.map(function(id, idx){
+      return sb.from("photos").update({ position: idx+1 }).eq("id", id);
+    })).then(function(){
+      btn.textContent = prev;
+      return loadPhotos().then(function(){ toast("순서를 섞었습니다"); });
+    });
+  });
 
   /* ---------- 손님 업로드 자동 보정 (색·밝기·대비·선명) ----------
      감탄 콘솔이 아니라 이 손님 업로드 페이지에서 올라오는 사진에만 적용됩니다.
@@ -540,7 +643,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   /* ---------- 줄이기 ---------- */
-  function shrink(file){
+  function shrink(file, doEnhance){
     return new Promise(function(resolve, reject){
       var fr = new FileReader();
       fr.onerror = function(){ reject(new Error("read")); };
@@ -554,7 +657,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
           var cv = document.createElement("canvas");
           cv.width = cw; cv.height = ch;
           cv.getContext("2d").drawImage(img, 0, 0, cw, ch);
-          enhancePhoto(cv);
+          if(doEnhance) enhancePhoto(cv);
           cv.toBlob(function(blob){
             blob ? resolve(blob) : reject(new Error("encode"));
           }, "image/jpeg", QUALITY);
@@ -565,15 +668,41 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     });
   }
 
-  /* ---------- 올리기 ---------- */
-  addBtn.addEventListener("click", function(){
-    fileEl.click();
-  });
+  /* ---------- 올리기 (눌러서 고르기 + PC 드래그) ---------- */
+  addBtn.addEventListener("click", function(){ fileEl.click(); });
 
   fileEl.addEventListener("change", function(){
-    var picked = Array.prototype.slice.call(fileEl.files || [])
-      .filter(function(f){ return /^image\//.test(f.type); });
+    handleFiles(fileEl.files);
     fileEl.value = "";
+  });
+
+  function dtHasFiles(dt){
+    if(!dt || !dt.types) return false;
+    for(var k=0;k<dt.types.length;k++) if(dt.types[k] === "Files") return true;
+    return false;
+  }
+  ["dragenter","dragover"].forEach(function(ev){
+    document.addEventListener(ev, function(e){
+      if(app.hidden || !dtHasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      document.body.classList.add("dragging");
+    });
+  });
+  document.addEventListener("dragleave", function(e){
+    if(!e.relatedTarget) document.body.classList.remove("dragging");
+  });
+  document.addEventListener("drop", function(e){
+    if(app.hidden) return;
+    document.body.classList.remove("dragging");
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      e.preventDefault();
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  function handleFiles(fileList){
+    var picked = Array.prototype.slice.call(fileList || [])
+      .filter(function(f){ return /^image\//.test(f.type); });
     if(!picked.length) return;
 
     var room = MAX - photos.length;
@@ -581,6 +710,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     var over = picked.length - room;
     if(over > 0) picked = picked.slice(0, room);
 
+    var doEnhance = $("autoEnh").checked;
     var basePos = photos.length ? Math.max.apply(null, photos.map(function(p){ return p.position||0; })) : 0;
 
     addBtn.disabled = true;
@@ -600,7 +730,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       addBtn.textContent = "올리는 중 " + (i+1) + " / " + picked.length;
 
       var f = picked[i];
-      shrink(f).then(function(blob){
+      shrink(f, doEnhance).then(function(blob){
         var path = frame.id + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,9) + ".jpg";
         return sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" })
           .then(function(r){
@@ -618,7 +748,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
         .then(function(){ step(i+1); });
     }
     step(0);
-  });
+  }
 
   /* ---------- 미리보기 ---------- */
   var pi = 0, ptimer = null;
@@ -627,7 +757,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     if(!photos.length){
       sImg.hidden = true; sTag.hidden = true; sNone.hidden = false; return;
     }
-    sNone.hidden = true; sImg.hidden = false; sTag.hidden = false;
+    sNone.hidden = true; sImg.hidden = false; sTag.hidden = true;
     if(pi >= photos.length) pi = 0;
     showOne();
     ptimer = setInterval(function(){ pi = (pi+1) % photos.length; showOne(); }, 4000);
@@ -635,9 +765,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   function showOne(){
     var p = photos[pi];
     sImg.src = publicUrl(p.path);
-    var m = (frame.message || "").trim();
-    sTag.hidden = !m;
-    sTag.textContent = m;
   }
 
   /* ---------- 설정 저장 ---------- */
@@ -649,18 +776,11 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   $("interval").addEventListener("change", function(){ saveFrame({ interval_sec: +this.value }); });
-  $("nameSel").addEventListener("change", function(){ saveFrame({ name_mode: this.value }); });
   $("sleepFrom").addEventListener("change", saveSleep);
   $("sleepTo").addEventListener("change", saveSleep);
   function saveSleep(){
     saveFrame({ sleep_from: $("sleepFrom").value, sleep_to: $("sleepTo").value });
   }
-
-  $("framemsg").addEventListener("change", function(){
-    var v = this.value.trim().slice(0, 40);
-    saveFrame({ message: v });
-    if(frame) paintScreen();
-  });
 })();
 </script>
 </body>

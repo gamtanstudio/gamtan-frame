@@ -35,7 +35,7 @@
   .err{font-size:13px;color:var(--danger);margin:10px 0 0;min-height:20px}
 
   /* 본문 */
-  #app{padding-bottom:172px}
+  #app{padding-bottom:40px}
   header{padding:22px 0 14px;display:flex;align-items:flex-start;gap:12px}
   header .t{flex:1;min-width:0}
   .brand{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
@@ -171,6 +171,9 @@
   .enh{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--ink-2);margin-top:9px;cursor:pointer}
   .enh input{width:16px;height:16px;accent-color:var(--brass)}
 
+  /* 사진 올리기 묶음(모니터 바로 아래) */
+  .uploadbox{margin:0 0 8px}
+
   @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
 </style>
 </head>
@@ -225,20 +228,11 @@
       </div>
     </div>
 
-    <div class="sec-head">
-      <h2>올린 사진</h2>
-      <span class="count" id="count">0장</span>
+    <div class="uploadbox">
+      <button class="primary" id="add">사진 올리기</button>
+      <label class="enh"><input type="checkbox" id="autoEnh" checked>올릴 때 사진 자동 보정</label>
+      <div id="hint">눌러서 고르세요 · 여러 장 가능 · PC는 끌어다 놔도 됩니다</div>
     </div>
-
-    <div id="selbar" hidden>
-      <label class="selchk"><input type="checkbox" id="selAll">전체 선택</label>
-      <span class="sp"></span>
-      <button class="tbtn" id="shuffle">순서 섞기</button>
-      <button class="tbtn danger" id="selDel" disabled>선택 삭제</button>
-      <button class="tbtn danger" id="clearAll">전체 삭제</button>
-    </div>
-
-    <div id="list"></div>
 
     <div class="sec-head"><h2>액자 설정</h2></div>
 
@@ -258,14 +252,21 @@
       <span style="color:var(--muted);font-size:13px">–</span>
       <input type="time" id="sleepTo">
     </div>
-  </div>
 
-  <div id="bar">
-    <div class="wrap">
-      <button class="primary" id="add">사진 올리기</button>
-      <label class="enh"><input type="checkbox" id="autoEnh" checked>올릴 때 사진 자동 보정</label>
-      <div id="hint">눌러서 고르세요 · 여러 장 가능 · PC는 끌어다 놔도 됩니다</div>
+    <div class="sec-head">
+      <h2>올린 사진</h2>
+      <span class="count" id="count">0장</span>
     </div>
+
+    <div id="selbar" hidden>
+      <label class="selchk"><input type="checkbox" id="selAll">전체 선택</label>
+      <span class="sp"></span>
+      <button class="tbtn" id="shuffle">순서 섞기</button>
+      <button class="tbtn danger" id="selDel" disabled>선택 삭제</button>
+      <button class="tbtn danger" id="clearAll">전체 삭제</button>
+    </div>
+
+    <div id="list"></div>
   </div>
 </div>
 

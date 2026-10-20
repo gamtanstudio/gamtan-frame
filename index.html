@@ -35,7 +35,7 @@
   .err{font-size:13px;color:var(--danger);margin:10px 0 0;min-height:20px}
 
   /* 본문 */
-  #app{padding-bottom:104px}
+  #app{padding-bottom:172px}
   header{padding:22px 0 14px;display:flex;align-items:flex-start;gap:12px}
   header .t{flex:1;min-width:0}
   .brand{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
@@ -597,12 +597,12 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
         for(i=0;i<256;i++){ var v=(i-lo)*sc; lut[i]= v<0?0:(v>255?255:(v|0)); }
       }
 
-      /* 평균이 어두우면 아주 약하게만 띄우기 */
+      /* 전체적으로 살짝 밝게 — 어두운 사진은 더 많이 (유관상 조금 밝고 쨍하게) */
       var sum=0; for(i=0;i<256;i++) sum+=i*hist[i];
       var mean = sum/px;
-      var gamma = (mean < 100) ? 0.9 : 1;
+      var gamma = (mean < 110) ? 0.84 : 0.92;
 
-      var SAT = 1.12; /* 채도 +12% */
+      var SAT = 1.16; /* 채도 +16% */
       for(i=0;i<n;i+=4){
         var r=d[i], g=d[i+1], b=d[i+2];
         if(lut){ r=lut[r]; g=lut[g]; b=lut[b]; }
@@ -621,7 +621,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       }
 
       /* 가벼운 선명(언샤프, 3x3 라플라시안) */
-      var AMT = 0.18;
+      var AMT = 0.24;
       var out = new Uint8ClampedArray(d.length);
       out.set(d);
       var W4 = w*4;

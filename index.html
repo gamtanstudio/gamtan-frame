@@ -643,6 +643,86 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     }catch(e){ /* 보정 실패 시 원본 그대로 */ }
   }
 
+  /* ---------- 찍은 날짜 읽기 (EXIF DateTimeOriginal, 없으면 파일 수정일) ----------
+     날짜 기반 '추억' 기능용. JPEG의 EXIF에서 촬영일을 읽고, 없으면 파일의
+     마지막 수정일로 대체. 어떤 이유로든 실패하면 null(그 사진은 날짜 없음). */
+  function readTakenAt(file){
+    return new Promise(function(resolve){
+      function fallback(){
+        if(file && file.lastModified){
+          try{ return resolve(new Date(file.lastModified).toISOString()); }catch(e){}
+        }
+        resolve(null);
+      }
+      try{
+        var fr = new FileReader();
+        fr.onerror = fallback;
+        fr.onload = function(){
+          var d = null;
+          try{ d = parseExifDate(new DataView(fr.result)); }catch(e){ d = null; }
+          if(d && !isNaN(d.getTime())) resolve(d.toISOString());
+          else fallback();
+        };
+        fr.readAsArrayBuffer(file.slice(0, 256 * 1024));
+      }catch(e){ fallback(); }
+    });
+  }
+
+  function parseExifDate(dv){
+    if(dv.byteLength < 4 || dv.getUint16(0) !== 0xFFD8) return null; /* JPEG 아님 */
+    var off = 2, len = dv.byteLength;
+    while(off + 4 <= len){
+      var marker = dv.getUint16(off);
+      if((marker & 0xFF00) !== 0xFF00) break;
+      var size = dv.getUint16(off + 2);
+      if(marker === 0xFFE1 && off + 10 <= len &&
+         dv.getUint32(off + 4) === 0x45786966 && dv.getUint16(off + 8) === 0x0000){
+        return parseTiffDate(dv, off + 10);
+      }
+      off += 2 + size;
+    }
+    return null;
+  }
+
+  function parseTiffDate(dv, base){
+    var endian = dv.getUint16(base);
+    if(endian !== 0x4949 && endian !== 0x4D4D) return null;
+    var little = (endian === 0x4949);
+    var ifd0 = base + dv.getUint32(base + 4, little);
+    var s = null;
+    var exifPtr = readExifTag(dv, base, ifd0, 0x8769, little);     /* ExifIFD 포인터 */
+    if(exifPtr) s = readExifTag(dv, base, base + exifPtr, 0x9003, little); /* DateTimeOriginal */
+    if(!s) s = readExifTag(dv, base, ifd0, 0x0132, little);        /* DateTime */
+    if(typeof s !== "string") return null;
+    var m = s.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if(!m) return null;
+    var d = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function readExifTag(dv, base, ifdOff, tag, little){
+    if(ifdOff + 2 > dv.byteLength) return null;
+    var n = dv.getUint16(ifdOff, little), i, e;
+    for(i = 0; i < n; i++){
+      e = ifdOff + 2 + i * 12;
+      if(e + 12 > dv.byteLength) break;
+      if(dv.getUint16(e, little) !== tag) continue;
+      var type = dv.getUint16(e + 2, little);
+      var count = dv.getUint32(e + 4, little);
+      if(type === 2){ /* ASCII */
+        var strOff = (count > 4) ? (base + dv.getUint32(e + 8, little)) : (e + 8);
+        var str = "", k;
+        for(k = 0; k < count - 1 && strOff + k < dv.byteLength; k++){
+          str += String.fromCharCode(dv.getUint8(strOff + k));
+        }
+        return str;
+      }
+      if(type === 4) return dv.getUint32(e + 8, little); /* LONG */
+      if(type === 3) return dv.getUint16(e + 8, little); /* SHORT */
+    }
+    return null;
+  }
+
   /* ---------- 줄이기 ---------- */
   function shrink(file, doEnhance){
     return new Promise(function(resolve, reject){
@@ -731,20 +811,23 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       addBtn.textContent = "올리는 중 " + (i+1) + " / " + picked.length;
 
       var f = picked[i];
-      shrink(f, doEnhance).then(function(blob){
-        var path = frame.id + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,9) + ".jpg";
-        return sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" })
-          .then(function(r){
-            if(r.error) throw r.error;
-            return sb.from("photos").insert({
-              frame_id: frame.id,
-              path: path,
-              name: f.name.replace(/\.[^.]+$/, ""),
-              position: basePos + i + 1,
-              bytes: blob.size
-            });
-          })
-          .then(function(r){ if(r.error) throw r.error; ok++; });
+      readTakenAt(f).then(function(takenAt){
+        return shrink(f, doEnhance).then(function(blob){
+          var path = frame.id + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,9) + ".jpg";
+          return sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" })
+            .then(function(r){
+              if(r.error) throw r.error;
+              return sb.from("photos").insert({
+                frame_id: frame.id,
+                path: path,
+                name: f.name.replace(/\.[^.]+$/, ""),
+                position: basePos + i + 1,
+                bytes: blob.size,
+                taken_at: takenAt
+              });
+            })
+            .then(function(r){ if(r.error) throw r.error; ok++; });
+        });
       }).catch(function(){ bad++; })
         .then(function(){ step(i+1); });
     }

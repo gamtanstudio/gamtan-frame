@@ -257,7 +257,7 @@ for(var i = 0; i < list.length; i++){
     var im = new Image();
     im.onload = im.onerror = function(){
       var w = im.naturalWidth || 1, h = im.naturalHeight || 1;
-      out[i] = { url:u, by:p.by, name:p.name, caption:p.caption, portrait: h > w * 1.05 };
+      out[i] = { url:u, by:p.by, name:p.name, caption:p.caption, taken_at:p.taken_at, portrait: h > w * 1.05 };
       if(--left === 0){
         photos = [];
         for(var k = 0; k < out.length; k++){ if(out[k]) photos.push(out[k]); }
@@ -273,9 +273,45 @@ for(var i = 0; i < list.length; i++){
 }
 }
 
+/* ---------- 날짜 추억 + 랜덤 ----------
+   • 사진 순서는 매번 랜덤으로 섞음(똑같은 순서 반복 방지).
+   • 오늘(월·일)에 찍힌 지난 해 사진이 있으면 'N년 전 오늘'로 앞쪽에 먼저 보여줌.
+   • taken_at 이 없거나 날짜 기능이 안 먹어도 그냥 전체 랜덤으로 안전하게 동작. */
+var builtDay = "";
+
+function todayKey(){ var n = new Date(); return n.getFullYear()+"-"+n.getMonth()+"-"+n.getDate(); }
+
+/* 오늘과 월·일이 같고 지난 해면 그 햇수(>=1), 아니면 0 */
+function memYears(dateStr){
+if(!dateStr) return 0;
+var d = new Date(dateStr);
+if(isNaN(d.getTime())) return 0;
+var n = new Date();
+if(d.getMonth() === n.getMonth() && d.getDate() === n.getDate()){
+  var y = n.getFullYear() - d.getFullYear();
+  return y >= 1 ? y : 0;
+}
+return 0;
+}
+
+function shuffle(arr){
+for(var i = arr.length - 1; i > 0; i--){
+  var j = Math.floor(Math.random() * (i + 1));
+  var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+}
+return arr;
+}
+
 function build(){
+builtDay = todayKey();
+var mem = [], rest = [];
+for(var i = 0; i < photos.length; i++){
+  if(memYears(photos[i].taken_at) > 0) mem.push(photos[i]); else rest.push(photos[i]);
+}
+shuffle(mem); shuffle(rest);
+var ordered = mem.concat(rest);
 slides = [];
-for(var i = 0; i < photos.length; i++){ slides.push([photos[i]]); }
+for(var k = 0; k < ordered.length; k++){ slides.push([ordered[k]]); }
 }
 
 /* ---------- 넘기기 ---------- */
@@ -304,16 +340,25 @@ for(var g = 0; g < group.length; g++){
 incoming.className = "slot on";
 outgoing.className = "slot";
 
-var labelText = conf.message || "";
-if(conf.name_mode !== "off" && labelText){
+var memY = (group[0] ? memYears(group[0].taken_at) : 0);
+if(memY > 0){
+  /* 오늘 날짜의 지난 해 사진 → '추억' 라벨 */
   sender.className = "";
-  senderText.textContent = labelText;
+  senderText.textContent = memY + "년 전 오늘";
   setTimeout(function(){ sender.className = "on"; }, 400);
-  if(conf.name_mode !== "always"){
-    setTimeout(function(){ sender.className = ""; }, 6000);
-  }
+  setTimeout(function(){ sender.className = ""; }, 6000);
 }else{
-  sender.className = "";
+  var labelText = conf.message || "";
+  if(conf.name_mode !== "off" && labelText){
+    sender.className = "";
+    senderText.textContent = labelText;
+    setTimeout(function(){ sender.className = "on"; }, 400);
+    if(conf.name_mode !== "always"){
+      setTimeout(function(){ sender.className = ""; }, 6000);
+    }
+  }else{
+    sender.className = "";
+  }
 }
 
 var nx = slides[(idx + 1) % slides.length];
@@ -343,6 +388,13 @@ var on = isNight();
 if(on){ night.className = "on"; clearInterval(timer); timer = null; }
 else{ night.className = ""; if(!timer && slides.length > 1) restart(); }
 }, 20000);
+
+/* 날짜가 바뀌면(자정 넘어가면) '오늘의 추억'을 다시 계산 */
+setInterval(function(){
+if(photos.length && builtDay !== todayKey()){
+  build(); idx = -1; next(); restart();
+}
+}, 60000);
 
 /* ---------- 숨은 문 (왼쪽 위 구석 5번 탭) ---------- */
 var taps = 0, tapTimer = null;

@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>감탄 액자 — 사진 관리</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1A1612">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="감탄 액자">
+<link rel="icon" href="icon-192.png">
 <style>
   :root{
     --paper:#FAF7F2; --card:#FFFFFF; --ink:#241F1A; --ink-2:#5A5148;
@@ -20,11 +26,19 @@
   [hidden]{display:none !important}
 
   /* 로그인 */
-  #login{min-height:100dvh;display:grid;place-items:center;padding:24px}
-  #login .box{width:100%;max-width:340px}
-  #login .mark{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
-  #login h1{font-size:22px;font-weight:600;margin:9px 0 4px}
-  #login p{font-size:13px;color:var(--muted);margin-bottom:22px}
+  #login,#join{min-height:100dvh;display:grid;place-items:center;padding:24px}
+  #login .box,#join .box{width:100%;max-width:340px}
+  #login .mark,#join .mark{font-size:11px;letter-spacing:.34em;color:var(--brass);text-transform:uppercase}
+  #login h1,#join h1{font-size:22px;font-weight:600;margin:9px 0 4px}
+  #login p,#join p{font-size:13px;color:var(--muted);margin-bottom:22px}
+  #join p.err{margin-bottom:0}
+
+  /* 홈 화면 아이콘 안내 */
+  #installBar{display:flex;align-items:center;gap:10px;background:var(--brass-soft);
+    border-radius:var(--r);padding:10px 12px;margin:0 0 14px;font-size:13px;color:var(--ink-2)}
+  #installBar img{width:34px;height:34px;border-radius:8px;flex:none}
+  #installBar span{flex:1;line-height:1.45}
+  #installBar .link{flex:none}
   .field{margin-bottom:10px}
   .field label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:5px}
   .field input{
@@ -200,6 +214,25 @@
   </div>
 </div>
 
+<!-- QR로 처음 들어온 손님: 가입하고 액자 연결 -->
+<div id="join" hidden>
+  <div class="box">
+    <div class="mark">Gamtan</div>
+    <h1>감탄 액자 연결</h1>
+    <p>이메일과 비밀번호를 정하면 이 액자에 바로 연결됩니다</p>
+    <div class="field">
+      <label for="jEmail">이메일</label>
+      <input id="jEmail" type="email" autocomplete="username" inputmode="email">
+    </div>
+    <div class="field">
+      <label for="jPw">비밀번호 (6자 이상)</label>
+      <input id="jPw" type="password" autocomplete="new-password">
+    </div>
+    <p class="err" id="joinErr"></p>
+    <button class="primary" id="joinBtn" style="margin-top:6px">연결하기</button>
+  </div>
+</div>
+
 <!-- 본문 -->
 <div id="app" hidden>
   <div class="wrap">
@@ -211,6 +244,13 @@
       </div>
       <button class="link" id="signout">로그아웃</button>
     </header>
+
+    <div id="installBar" hidden>
+      <img src="icon-192.png" alt="">
+      <span id="installTxt">홈 화면에 감탄 액자 아이콘을 만들어 두면 바로 들어올 수 있어요</span>
+      <button class="tbtn" id="installBtn">아이콘 만들기</button>
+      <button class="link" id="installX" aria-label="닫기">✕</button>
+    </div>
 
     <div class="frame-card">
       <div class="screen">
@@ -321,8 +361,66 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       .then(function(r){
         btn.disabled = false; btn.textContent = "로그인";
         if(r.error){ err.textContent = "이메일이나 비밀번호를 다시 확인해주세요"; return; }
-        start();
+        afterAuth();
       });
+  }
+
+  /* ---------- QR로 들어온 손님: 액자 연결 코드 ---------- */
+  var CLAIM = (function(){
+    var m = location.search.match(/[?&]c=([A-Za-z0-9]+)/), c = m ? m[1].toUpperCase() : null;
+    try{
+      if(c) sessionStorage.setItem("gtClaim", c);
+      else c = sessionStorage.getItem("gtClaim");
+    }catch(e){}
+    if(m) history.replaceState(null, "", location.pathname);
+    return c;
+  })();
+  function clearClaim(){ CLAIM = null; try{ sessionStorage.removeItem("gtClaim"); }catch(e){} }
+
+  function afterAuth(){
+    if(!CLAIM){ start(); return; }
+    boot.hidden = false; loginBox.hidden = true; $("join").hidden = true;
+    boot.textContent = "액자를 연결하는 중…";
+    sb.rpc("claim_frame", { p_code: CLAIM }).then(function(r){
+      var msg = r.error && String(r.error.message || "");
+      clearClaim();
+      if(msg){
+        if(msg.indexOf("already_claimed") >= 0) toast("이미 다른 분이 연결한 액자입니다. 사진관에 문의해 주세요");
+        else if(msg.indexOf("bad_code") >= 0) toast("QR 코드를 확인하지 못했습니다. 사진관에 문의해 주세요");
+        else toast("액자를 연결하지 못했습니다. 사진관에 문의해 주세요");
+      }
+      start();
+    });
+  }
+
+  $("joinBtn").addEventListener("click", join);
+  $("jPw").addEventListener("keydown", function(e){ if(e.key === "Enter") join(); });
+
+  function join(){
+    var email = $("jEmail").value.trim(), pw = $("jPw").value;
+    var btn = $("joinBtn"), err = $("joinErr");
+    err.textContent = "";
+    if(!email || email.indexOf("@") < 0){ err.textContent = "이메일을 확인해주세요"; return; }
+    if(pw.length < 6){ err.textContent = "비밀번호는 6자 이상으로 정해주세요"; return; }
+    btn.disabled = true; btn.textContent = "연결하는 중…";
+    function done(){ btn.disabled = false; btn.textContent = "연결하기"; }
+
+    sb.auth.signUp({ email: email, password: pw }).then(function(r){
+      if(r.error){
+        /* 이미 가입한 이메일이면 그 비밀번호로 로그인해서 연결 */
+        return sb.auth.signInWithPassword({ email: email, password: pw }).then(function(s){
+          done();
+          if(s.error){ err.textContent = "이미 가입된 이메일입니다. 비밀번호를 확인해주세요"; return; }
+          afterAuth();
+        });
+      }
+      done();
+      if(!r.data || !r.data.session){
+        err.textContent = "메일함의 확인 메일을 누른 뒤 QR을 다시 찍어주세요";
+        return;
+      }
+      afterAuth();
+    });
   }
 
   $("signout").addEventListener("click", function(){
@@ -331,9 +429,44 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
   /* ---------- 시작 ---------- */
   sb.auth.getSession().then(function(r){
-    if(r.data && r.data.session) start();
+    if(r.data && r.data.session) afterAuth();
+    else if(CLAIM){ boot.hidden = true; $("join").hidden = false; }
     else { boot.hidden = true; loginBox.hidden = false; }
   });
+
+  /* ---------- 홈 화면 아이콘 ---------- */
+  if("serviceWorker" in navigator){
+    try{ navigator.serviceWorker.register("sw.js"); }catch(e){}
+  }
+  (function(){
+    var bar = $("installBar"), deferred = null;
+    var standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+    var dismissed = false;
+    try{ dismissed = localStorage.getItem("gtInstallX") === "1"; }catch(e){}
+    if(standalone || dismissed) return;
+
+    window.addEventListener("beforeinstallprompt", function(e){
+      e.preventDefault(); deferred = e; bar.hidden = false;
+    });
+    $("installBtn").addEventListener("click", function(){
+      if(!deferred) return;
+      deferred.prompt();
+      deferred.userChoice.then(function(c){
+        deferred = null;
+        if(c && c.outcome === "accepted") bar.hidden = true;
+      });
+    });
+    $("installX").addEventListener("click", function(){
+      bar.hidden = true;
+      try{ localStorage.setItem("gtInstallX", "1"); }catch(e){}
+    });
+    /* 아이폰은 자동 설치 창이 없어서 방법만 알려줌 */
+    if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
+      $("installTxt").textContent = "아래 공유 버튼 → '홈 화면에 추가'를 누르면 감탄 액자 아이콘이 생겨요";
+      $("installBtn").hidden = true;
+      bar.hidden = false;
+    }
+  })();
 
   function start(){
     boot.hidden = false; loginBox.hidden = true; app.hidden = true;

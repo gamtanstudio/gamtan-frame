@@ -78,10 +78,26 @@
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}
   th{font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;font-weight:500}
-  td .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  td .mono,td.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
   .dim{color:var(--muted)}
 
   #boot,#gate{min-height:70vh;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:24px}
+
+  /* QR 카드 (인쇄용) */
+  #qrCard{width:260px;margin:0 auto 6px;border:1px solid var(--line);border-radius:12px;padding:22px 18px;text-align:center;background:#fff}
+  #qrCard .qc-brand{font-size:10px;letter-spacing:.42em;color:var(--brass)}
+  #qrCard .qc-title{font-size:18px;font-weight:600;margin:4px 0 14px}
+  #qrBox{display:flex;justify-content:center}
+  #qrBox img,#qrBox canvas{width:180px;height:180px}
+  #qrCard .qc-how{font-size:12.5px;color:var(--ink-2);margin-top:14px;line-height:1.55}
+  #qrCard .qc-code{font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:.08em}
+  #printBtn{display:block;margin-left:auto !important;margin-right:auto !important}
+  .rowbtn{font-size:12px;padding:4px 9px}
+  @media print{
+    body *{visibility:hidden !important}
+    #qrCard,#qrCard *{visibility:visible !important}
+    #qrCard{position:absolute;left:0;top:0;border:1px solid #ccc}
+  }
 </style>
 </head>
 <body>
@@ -107,38 +123,29 @@
   <header>
     <div class="brand">Gamtan</div>
     <h1>액자 발급</h1>
-    <p>고객 정보를 넣으면 액자와 계정이 한 번에 만들어집니다</p>
   </header>
 
   <div class="card">
     <h2>새 액자 발급</h2>
-    <div class="sub">액자 번호는 자동으로 다음 번호가 매겨집니다</div>
-
     <div class="field">
       <label for="label">액자 이름</label>
-      <input id="label" type="text" placeholder="예: 김현지님 부모님 액자" maxlength="40">
-      <div class="note">관리 화면 맨 위에 표시됩니다</div>
+      <input id="label" type="text" maxlength="40">
     </div>
-
-    <div class="field">
-      <label for="cemail">고객 이메일</label>
-      <input id="cemail" type="email" placeholder="customer@example.com" autocomplete="off">
-      <div class="note">자녀분이 로그인할 아이디입니다</div>
-    </div>
-
-    <div class="field">
-      <label for="cpw">비밀번호</label>
-      <input id="cpw" type="text" autocomplete="off">
-      <div class="note">6자 이상. 고객에게 그대로 알려주세요</div>
-    </div>
-
     <button class="primary" id="issue">발급하기</button>
     <p class="msg" id="msg"></p>
   </div>
 
   <div class="card" id="result" hidden>
     <h2>발급 완료</h2>
-    <div class="sub">아래 내용을 고객에게 전달하세요</div>
+
+    <div id="qrCard">
+      <div class="qc-brand">GAMTAN</div>
+      <div class="qc-title">감탄 액자</div>
+      <div id="qrBox"></div>
+      <div class="qc-how">휴대폰 카메라로 찍어서<br>액자를 연결해 주세요</div>
+      <div class="qc-code" id="qcCode">—</div>
+    </div>
+    <button class="ghost" id="printBtn" style="margin:4px 0 16px">QR 카드 인쇄</button>
 
     <div class="out">
       <div class="k">액자 번호</div>
@@ -146,30 +153,19 @@
     </div>
 
     <div class="out">
-      <div class="k">고객이 쓸 관리 주소</div>
+      <div class="k">기기에 넣을 토큰</div>
       <div class="row">
-        <div class="v" id="rAdmin">—</div>
-        <button class="ghost" data-copy="rAdmin">복사</button>
+        <div class="v" id="rToken">—</div>
+        <button class="ghost" data-copy="rToken">복사</button>
       </div>
+      <div class="warn">토큰은 고객에게 주지 않습니다. 출고 전에 액자 기기에만 넣습니다.</div>
     </div>
 
     <div class="out">
-      <div class="k">액자 기기에 넣을 주소</div>
+      <div class="k">QR 주소</div>
       <div class="row">
-        <div class="v" id="rFrame">—</div>
-        <button class="ghost" data-copy="rFrame">복사</button>
-      </div>
-      <div class="warn">
-        이 주소는 고객에게 주지 마세요. 액자 기기의 시작 페이지에만 넣습니다.
-        주소를 아는 사람은 이 액자 사진을 볼 수 있습니다.
-      </div>
-    </div>
-
-    <div class="out">
-      <div class="k">고객 안내 문구</div>
-      <div class="row">
-        <div class="v" id="rGuide">—</div>
-        <button class="ghost" data-copy="rGuide">복사</button>
+        <div class="v" id="rJoin">—</div>
+        <button class="ghost" data-copy="rJoin">복사</button>
       </div>
     </div>
   </div>
@@ -178,7 +174,7 @@
     <h2>발급한 액자</h2>
     <div class="sub" id="listSub">불러오는 중…</div>
     <table>
-      <thead><tr><th>번호</th><th>이름</th><th>마지막 확인</th></tr></thead>
+      <thead><tr><th>번호</th><th>이름</th><th>고객 연결</th><th>마지막 확인</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -186,6 +182,7 @@
   <button class="ghost" id="out">로그아웃</button>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 var SB_URL  = "https://sdjhvtljrzkvniwdtwir.supabase.co";
@@ -233,52 +230,37 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
   }
 
   /* ---------- 발급 ---------- */
+  /* 헷갈리는 글자(0 O 1 I L) 뺀 8자리 연결 코드 */
+  function newClaimCode(){
+    var A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", out = "";
+    var r = new Uint32Array(8); crypto.getRandomValues(r);
+    for(var i = 0; i < 8; i++) out += A[r[i] % A.length];
+    return out;
+  }
+
   $("issue").addEventListener("click", function(){
     var label = $("label").value.trim();
-    var email = $("cemail").value.trim();
-    var pw    = $("cpw").value;
-    var m     = $("msg");
-
-    m.className = "msg";
-    if(!email || email.indexOf("@") < 0){ m.className = "msg bad"; m.textContent = "고객 이메일을 확인해주세요"; return; }
-    if(pw.length < 6){ m.className = "msg bad"; m.textContent = "비밀번호는 6자 이상이어야 합니다"; return; }
-
-    var btn = $("issue");
+    var m = $("msg"), btn = $("issue");
+    m.className = "msg"; m.textContent = "";
     btn.disabled = true; btn.textContent = "발급 중…";
-    m.textContent = "";
 
-    var frame = null, uid = null;
-
-    ensureUser(email, pw)
-      .then(function(id){
-        uid = id;
-        return nextCode();
-      })
+    nextCode()
       .then(function(code){
-        return sb.from("frames").insert({ code: code, label: label || null })
-                 .select("id, code, token").single();
+        return sb.from("frames").insert({ code: code, label: label || null, claim_code: newClaimCode() })
+                 .select("id, code, token, claim_code").single();
       })
       .then(function(r){
         if(r.error) throw new Error("액자를 만들지 못했습니다");
-        frame = r.data;
-        return sb.from("frame_members")
-                 .insert({ frame_id: frame.id, user_id: uid, role: "owner" });
-      })
-      .then(function(r){
-        if(r.error) throw new Error("계정과 액자를 연결하지 못했습니다");
-        show(frame, email, pw);
-        m.className = "msg good";
-        m.textContent = "발급되었습니다";
-        $("label").value = ""; $("cemail").value = ""; $("cpw").value = "";
+        show(r.data);
+        m.className = "msg good"; m.textContent = "발급되었습니다";
+        $("label").value = "";
         loadList();
       })
       .catch(function(err){
         m.className = "msg bad";
         m.textContent = (err && err.message) || "발급에 실패했습니다";
       })
-      .then(function(){
-        btn.disabled = false; btn.textContent = "발급하기";
-      });
+      .then(function(){ btn.disabled = false; btn.textContent = "발급하기"; });
   });
 
   /* 다음 액자 번호 */
@@ -294,43 +276,21 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
       });
   }
 
-  /* 계정이 없으면 만들고, 있으면 그 계정을 씁니다 */
-  function ensureUser(email, pw){
-    return sb.rpc("staff_find_user", { p_email: email }).then(function(r){
-      if(r.data) return r.data;
-      var tmp = window.supabase.createClient(SB_URL, SB_KEY, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-          storageKey: "gamtan-signup-temp"
-        }
-      });
-      return tmp.auth.signUp({ email: email, password: pw }).then(function(s){
-        if(s.error || !s.data || !s.data.user){
-          throw new Error("계정을 만들지 못했습니다. 이미 있는 이메일인지 확인해주세요");
-        }
-        return s.data.user.id;
-      });
-    });
-  }
+  function joinUrl(cc){ return BASE + "index.html?c=" + cc; }
 
-  function show(frame, email, pw){
-    var admin = BASE + "index.html";
-    var fr    = BASE + "frame.html?t=" + frame.token;
-    $("rCode").textContent  = frame.code;
-    $("rAdmin").textContent = admin;
-    $("rFrame").textContent = fr;
-    $("rGuide").textContent =
-      "감탄사진관 액자 안내\n\n" +
-      "아래 주소로 들어가셔서 사진을 넣어주세요.\n" + admin + "\n\n" +
-      "아이디: " + email + "\n" +
-      "비밀번호: " + pw + "\n\n" +
-      "액자 번호: " + frame.code + "\n" +
-      "처음 들어가시면 '내 이름'을 먼저 정해주세요. 부모님 액자에 그 이름으로 표시됩니다.";
+  function show(f){
+    $("rCode").textContent  = f.code;
+    $("qcCode").textContent = f.code;
+    $("rToken").textContent = f.token;
+    var url = f.claim_code ? joinUrl(f.claim_code) : "";
+    $("rJoin").textContent = url || "—";
+    var box = $("qrBox"); box.innerHTML = "";
+    if(url) new QRCode(box, { text: url, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
     $("result").hidden = false;
     $("result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  $("printBtn").addEventListener("click", function(){ window.print(); });
 
   /* 복사 */
   document.addEventListener("click", function(e){
@@ -344,27 +304,34 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
   });
 
   /* ---------- 목록 ---------- */
+  var listData = [];
   function loadList(){
-    sb.from("frames").select("code, label, last_seen_at").order("code", { ascending: false })
+    sb.from("frames").select("id, code, label, token, claim_code, claimed_at, last_seen_at").order("code", { ascending: false })
       .then(function(r){
         var rows = $("rows"); rows.innerHTML = "";
-        var list = r.data || [];
-        $("listSub").textContent = list.length ? "모두 " + list.length + "대" : "아직 발급한 액자가 없습니다";
-        list.forEach(function(f){
+        listData = r.data || [];
+        $("listSub").textContent = listData.length ? "모두 " + listData.length + "대" : "아직 발급한 액자가 없습니다";
+        listData.forEach(function(f, i){
           var tr = document.createElement("tr");
-          var a = document.createElement("td");
-          a.innerHTML = '<span class="mono">' + f.code + '</span>';
-          var b = document.createElement("td");
-          b.textContent = f.label || "—";
-          if(!f.label) b.className = "dim";
-          var c = document.createElement("td");
-          c.textContent = ago(f.last_seen_at);
-          c.className = "dim";
-          tr.appendChild(a); tr.appendChild(b); tr.appendChild(c);
+          function td(txt, cls){ var d = document.createElement("td"); d.textContent = txt; if(cls) d.className = cls; tr.appendChild(d); return d; }
+          td(f.code, "mono");
+          td(f.label || "—", f.label ? "" : "dim");
+          td(f.claimed_at ? "연결됨" : (f.claim_code ? "대기" : "—"), f.claimed_at ? "" : "dim");
+          td(ago(f.last_seen_at), "dim");
+          var c = td("");
+          if(f.claim_code){
+            var b = document.createElement("button");
+            b.className = "ghost rowbtn"; b.textContent = "QR"; b.dataset.i = i;
+            c.appendChild(b);
+          }
           rows.appendChild(tr);
         });
       });
   }
+  $("rows").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-i]");
+    if(b) show(listData[+b.dataset.i]);
+  });
 
   function ago(t){
     if(!t) return "연결 전";

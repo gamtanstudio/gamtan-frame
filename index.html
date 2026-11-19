@@ -293,6 +293,11 @@
       <input type="time" id="sleepTo">
     </div>
 
+    <div class="setting">
+      <span class="label"><b>화면</b><span id="scrState">켜져 있습니다</span></span>
+      <button class="tbtn" id="scrBtn">지금 끄기</button>
+    </div>
+
     <div class="sec-head">
       <h2>올린 사진</h2>
       <span class="count" id="count">0장</span>
@@ -492,8 +497,9 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     if(frame.label) $("frameLabel").textContent = frame.label;
     MAX = frame.max_photos || 100;
     $("interval").value = String(frame.interval_sec);
-    $("sleepFrom").value = (frame.sleep_from || "22:00:00").slice(0,5);
-    $("sleepTo").value   = (frame.sleep_to   || "07:00:00").slice(0,5);
+    $("sleepFrom").value = frame.sleep_from ? String(frame.sleep_from).slice(0,5) : "";
+    $("sleepTo").value   = frame.sleep_to   ? String(frame.sleep_to).slice(0,5)   : "";
+    paintScreen();
     paintStatus();
   }
 
@@ -996,8 +1002,25 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   $("sleepFrom").addEventListener("change", saveSleep);
   $("sleepTo").addEventListener("change", saveSleep);
   function saveSleep(){
-    saveFrame({ sleep_from: $("sleepFrom").value, sleep_to: $("sleepTo").value });
+    var a = $("sleepFrom").value, b = $("sleepTo").value;
+    if(a && b) saveFrame({ sleep_from: a, sleep_to: b });
+    else if(!a && !b) saveFrame({ sleep_from: null, sleep_to: null });
   }
+
+  /* 지금 끄기 / 켜기 */
+  function paintScreen(){
+    var off = !!frame.screen_off;
+    $("scrState").textContent = off ? "꺼져 있습니다" : "켜져 있습니다";
+    $("scrBtn").textContent = off ? "지금 켜기" : "지금 끄기";
+  }
+  $("scrBtn").addEventListener("click", function(){
+    var off = !frame.screen_off;
+    frame.screen_off = off; paintScreen();
+    sb.from("frames").update({ screen_off: off }).eq("id", frame.id).then(function(r){
+      if(r.error){ frame.screen_off = !off; paintScreen(); toast("바꾸지 못했습니다"); return; }
+      toast(off ? "30초 안에 액자 화면이 꺼집니다" : "30초 안에 액자 화면이 켜집니다");
+    });
+  });
 })();
 </script>
 </body>

@@ -231,6 +231,10 @@
       <label for="jPw">비밀번호 (6자 이상)</label>
       <input id="jPw" type="password" autocomplete="new-password">
     </div>
+    <div class="field">
+      <label for="jPw2">비밀번호 확인</label>
+      <input id="jPw2" type="password" autocomplete="new-password">
+    </div>
     <p class="err" id="joinErr"></p>
     <button class="primary" id="joinBtn" style="margin-top:6px">연결하기</button>
     <button class="link swap" id="toLogin">이미 가입하셨나요? 로그인</button>
@@ -447,7 +451,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   $("joinBtn").addEventListener("click", join);
-  $("jPw").addEventListener("keydown", function(e){ if(e.key === "Enter") join(); });
+  $("jPw2").addEventListener("keydown", function(e){ if(e.key === "Enter") join(); });
 
   function join(){
     var email = $("jEmail").value.trim(), pw = $("jPw").value;
@@ -455,6 +459,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     err.textContent = "";
     if(!email || email.indexOf("@") < 0){ err.textContent = "이메일을 확인해주세요"; return; }
     if(pw.length < 6){ err.textContent = "비밀번호는 6자 이상으로 정해주세요"; return; }
+    if(pw !== $("jPw2").value){ err.textContent = "비밀번호가 서로 달라요. 다시 확인해주세요"; $("jPw2").value = ""; $("jPw2").focus(); return; }
     btn.disabled = true; btn.textContent = "연결하는 중…";
     function done(){ btn.disabled = false; btn.textContent = "연결하기"; }
 

@@ -32,6 +32,8 @@
   #login h1,#join h1{font-size:22px;font-weight:600;margin:9px 0 4px}
   #login p,#join p{font-size:13px;color:var(--muted);margin-bottom:22px}
   #join p.err{margin-bottom:0}
+  .link.swap{display:block;margin:16px auto 0;font-size:13px}
+  #invUrl{flex:1;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* 홈 화면 아이콘 안내 */
   #installBar{display:flex;align-items:center;gap:10px;background:var(--brass-soft);
@@ -211,6 +213,7 @@
     </div>
     <p class="err" id="loginErr"></p>
     <button class="primary" id="signin" style="margin-top:6px">로그인</button>
+    <button class="link swap" id="toJoin" hidden>처음이세요? 가입하기</button>
   </div>
 </div>
 
@@ -218,8 +221,8 @@
 <div id="join" hidden>
   <div class="box">
     <div class="mark">Gamtan</div>
-    <h1>감탄 액자 연결</h1>
-    <p>이메일과 비밀번호를 정하면 이 액자에 바로 연결됩니다</p>
+    <h1 id="joinTitle">감탄 액자 연결</h1>
+    <p id="joinSub">이메일과 비밀번호를 정하면 이 액자에 바로 연결됩니다</p>
     <div class="field">
       <label for="jEmail">이메일</label>
       <input id="jEmail" type="email" autocomplete="username" inputmode="email">
@@ -230,6 +233,7 @@
     </div>
     <p class="err" id="joinErr"></p>
     <button class="primary" id="joinBtn" style="margin-top:6px">연결하기</button>
+    <button class="link swap" id="toLogin">이미 가입하셨나요? 로그인</button>
   </div>
 </div>
 
@@ -296,6 +300,12 @@
     <div class="setting">
       <span class="label"><b>화면</b><span id="scrState">켜져 있습니다</span></span>
       <button class="tbtn" id="scrBtn">지금 끄기</button>
+    </div>
+
+    <div class="setting">
+      <span class="label"><b>가족 초대</b><span id="invUrl"></span></span>
+      <button class="tbtn" id="invShare">링크 보내기</button>
+      <button class="link" id="invReset">새로 만들기</button>
     </div>
 
     <div class="sec-head">
@@ -377,22 +387,52 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       if(c) sessionStorage.setItem("gtClaim", c);
       else c = sessionStorage.getItem("gtClaim");
     }catch(e){}
-    if(m) history.replaceState(null, "", location.pathname);
     return c;
   })();
-  function clearClaim(){ CLAIM = null; try{ sessionStorage.removeItem("gtClaim"); }catch(e){} }
+  /* 가족 초대 링크 (?i=) */
+  var INVITE = (function(){
+    var m = location.search.match(/[?&]i=([A-Za-z0-9]+)/), c = m ? m[1].toUpperCase() : null;
+    try{
+      if(c) sessionStorage.setItem("gtInvite", c);
+      else c = sessionStorage.getItem("gtInvite");
+    }catch(e){}
+    return c;
+  })();
+  if(location.search) history.replaceState(null, "", location.pathname);
+  function clearClaim(){
+    CLAIM = null; INVITE = null;
+    try{ sessionStorage.removeItem("gtClaim"); sessionStorage.removeItem("gtInvite"); }catch(e){}
+  }
+  if(INVITE){
+    $("joinTitle").textContent = "가족 액자에 함께하기";
+    $("joinSub").textContent = "이메일과 비밀번호를 정하면 가족 액자에 사진을 올릴 수 있어요";
+  }
 
+  function showJoin(){ boot.hidden = true; loginBox.hidden = true; $("join").hidden = false; }
+  function showLogin(){
+    boot.hidden = true; $("join").hidden = true; loginBox.hidden = false;
+    $("toJoin").hidden = !(CLAIM || INVITE);
+  }
+  $("toLogin").addEventListener("click", function(){
+    var e = $("jEmail").value.trim(); if(e) $("email").value = e;
+    showLogin();
+  });
+  $("toJoin").addEventListener("click", showJoin);
+
+  var linkNote = "";
   function afterAuth(){
-    if(!CLAIM){ start(); return; }
+    if(!CLAIM && !INVITE){ start(); return; }
     boot.hidden = false; loginBox.hidden = true; $("join").hidden = true;
     boot.textContent = "액자를 연결하는 중…";
-    sb.rpc("claim_frame", { p_code: CLAIM }).then(function(r){
+    var call = INVITE ? sb.rpc("join_frame", { p_code: INVITE }) : sb.rpc("claim_frame", { p_code: CLAIM });
+    call.then(function(r){
       var msg = r.error && String(r.error.message || "");
       clearClaim();
       if(msg){
-        if(msg.indexOf("already_claimed") >= 0) toast("이미 다른 분이 연결한 액자입니다. 사진관에 문의해 주세요");
-        else if(msg.indexOf("bad_code") >= 0) toast("QR 코드를 확인하지 못했습니다. 사진관에 문의해 주세요");
-        else toast("액자를 연결하지 못했습니다. 사진관에 문의해 주세요");
+        if(msg.indexOf("already_claimed") >= 0) linkNote = "이미 다른 분이 연결한 액자예요. 먼저 연결하신 분께 '가족 초대' 링크를 받아 주세요.";
+        else if(msg.indexOf("bad_code") >= 0) linkNote = "링크가 맞지 않아요. 새 초대 링크를 받아 주세요.";
+        else linkNote = "액자를 연결하지 못했습니다. 사진관에 문의해 주세요.";
+        toast(linkNote);
       }
       start();
     });
@@ -435,8 +475,8 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   /* ---------- 시작 ---------- */
   sb.auth.getSession().then(function(r){
     if(r.data && r.data.session) afterAuth();
-    else if(CLAIM){ boot.hidden = true; $("join").hidden = false; }
-    else { boot.hidden = true; loginBox.hidden = false; }
+    else if(CLAIM || INVITE) showJoin();
+    else showLogin();
   });
 
   /* ---------- 홈 화면 아이콘 ---------- */
@@ -480,7 +520,13 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     sb.from("frame_members").select("frame_id, user_id, display_name, frames(*)").limit(1)
       .then(function(r){
         if(r.error || !r.data || !r.data.length){
-          boot.textContent = "연결된 액자가 없습니다. 사진관에 문의해주세요.";
+          boot.innerHTML = "";
+          var p = document.createElement("div");
+          p.textContent = linkNote || "연결된 액자가 없습니다. 사진관에 문의해주세요.";
+          var b = document.createElement("button");
+          b.className = "link swap"; b.textContent = "로그아웃";
+          b.onclick = function(){ sb.auth.signOut().then(function(){ location.reload(); }); };
+          boot.appendChild(p); boot.appendChild(b);
           return;
         }
         member = r.data[0];
@@ -501,7 +547,36 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     $("sleepTo").value   = frame.sleep_to   ? String(frame.sleep_to).slice(0,5)   : "";
     paintScreen();
     paintStatus();
+    paintInvite();
   }
+
+  /* ---------- 가족 초대 ---------- */
+  function inviteUrl(){
+    return location.origin + location.pathname.replace(/[^\/]*$/, "") + "index.html?i=" + frame.invite_code;
+  }
+  function paintInvite(){
+    $("invUrl").textContent = frame.invite_code ? inviteUrl() : "";
+  }
+  $("invShare").addEventListener("click", function(){
+    if(!frame || !frame.invite_code) return;
+    var url = inviteUrl();
+    var text = "감탄 액자에 같이 사진 올려요! 아래 링크를 눌러 가입하면 바로 함께할 수 있어요.\n" + url;
+    if(navigator.share){
+      navigator.share({ title: "감탄 액자 가족 초대", text: text }).catch(function(){});
+    }else if(navigator.clipboard){
+      navigator.clipboard.writeText(text).then(function(){ toast("초대 링크를 복사했어요. 카톡에 붙여넣어 보내세요"); });
+    }else{
+      prompt("아래 링크를 복사해서 보내세요", url);
+    }
+  });
+  $("invReset").addEventListener("click", function(){
+    if(!confirm("예전 초대 링크는 더 이상 안 열려요. 새 링크를 만들까요?")) return;
+    sb.rpc("reset_invite", { p_frame: frame.id }).then(function(r){
+      if(r.error){ toast("새 링크를 만들지 못했어요"); return; }
+      frame.invite_code = r.data; paintInvite();
+      toast("새 초대 링크를 만들었어요");
+    });
+  });
 
   /* ---------- 액자 상태 ---------- */
   function paintStatus(){

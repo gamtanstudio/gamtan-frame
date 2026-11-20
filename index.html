@@ -129,11 +129,12 @@
   .setting .label{flex:1;min-width:140px}
   .setting .label b{display:block;font-size:13px;font-weight:500}
   .setting .label span{font-size:12px;color:var(--muted)}
-  select,input[type=time],.setting input[type=text]{
+  select,input[type=time],.setting input[type=text],.setting input[type=password]{
     font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);
     border-radius:7px;background:var(--card);color:var(--ink);
   }
   .setting input[type=text]{width:130px}
+  #pwBox input{flex:1;min-width:0}
 
   #bar{
     position:fixed;left:0;right:0;bottom:0;background:rgba(250,247,242,.94);
@@ -310,6 +311,16 @@
       <span class="label"><b>가족 초대</b><span id="invUrl"></span></span>
       <button class="tbtn" id="invShare">링크 보내기</button>
       <button class="link" id="invReset">새로 만들기</button>
+    </div>
+
+    <div class="setting">
+      <span class="label"><b>비밀번호</b><span id="pwMsg"></span></span>
+      <button class="tbtn" id="pwOpen">바꾸기</button>
+    </div>
+    <div class="setting" id="pwBox" hidden>
+      <input type="password" id="pwNew" autocomplete="new-password" aria-label="새 비밀번호">
+      <input type="password" id="pwNew2" autocomplete="new-password" aria-label="새 비밀번호 확인">
+      <button class="tbtn" id="pwSave">저장</button>
     </div>
 
     <div class="sec-head">
@@ -562,6 +573,26 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     paintStatus();
     paintInvite();
   }
+
+  /* ---------- 비밀번호 바꾸기 ---------- */
+  $("pwOpen").addEventListener("click", function(){
+    var b = $("pwBox"); b.hidden = !b.hidden;
+    $("pwNew").value = ""; $("pwNew2").value = "";
+    $("pwNew").placeholder = "새 비밀번호"; $("pwNew2").placeholder = "한 번 더";
+    if(!b.hidden) $("pwNew").focus();
+  });
+  $("pwSave").addEventListener("click", function(){
+    var a = $("pwNew").value, b = $("pwNew2").value;
+    if(a.length < 6){ toast("비밀번호는 6자 이상으로 정해주세요"); return; }
+    if(a !== b){ toast("비밀번호가 서로 달라요"); $("pwNew2").value = ""; $("pwNew2").focus(); return; }
+    var btn = $("pwSave"); btn.disabled = true;
+    sb.auth.updateUser({ password: a }).then(function(r){
+      btn.disabled = false;
+      if(r.error){ toast("바꾸지 못했어요. 다시 로그인한 뒤 해주세요"); return; }
+      $("pwBox").hidden = true;
+      toast("비밀번호를 바꿨어요");
+    });
+  });
 
   /* ---------- 가족 초대 ---------- */
   function inviteUrl(){

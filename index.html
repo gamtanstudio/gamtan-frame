@@ -823,17 +823,25 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       /* 전체적으로 살짝 밝게 — 어두운 사진은 더 많이 (유관상 조금 밝고 쨍하게) */
       var sum=0; for(i=0;i<256;i++) sum+=i*hist[i];
       var mean = sum/px;
-      var gamma = (mean < 110) ? 0.84 : 0.92;
+      var gamma = (mean < 95) ? 0.86 : (mean < 125 ? 0.94 : 1);
 
-      var SAT = 1.16; /* 채도 +16% */
+      /* 톤 곡선 한 번에: 노출(levels) → 밝기(gamma) → 중간톤 대비 S커브(쨍하게) */
+      var tone = new Array(256);
+      var SC = 0.22; /* S커브 세기 */
+      for(i=0;i<256;i++){
+        var t = (lut ? lut[i] : i)/255;
+        if(gamma!==1) t = Math.pow(t, gamma);
+        var s = t*t*(3-2*t);           /* smoothstep */
+        t = t + (s - t)*SC*2;
+        tone[i] = t<0?0:(t>1?255:t*255);
+      }
+
       for(i=0;i<n;i+=4){
-        var r=d[i], g=d[i+1], b=d[i+2];
-        if(lut){ r=lut[r]; g=lut[g]; b=lut[b]; }
-        if(gamma!==1){
-          r=255*Math.pow(r/255,gamma);
-          g=255*Math.pow(g/255,gamma);
-          b=255*Math.pow(b/255,gamma);
-        }
+        var r=tone[d[i]], g=tone[d[i+1]], b=tone[d[i+2]];
+        /* 바이브런스: 색이 옅은 곳은 더, 이미 진한 곳(피부·빨강)은 덜 */
+        var mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+        var sat = mx>0 ? (mx-mn)/mx : 0;
+        var SAT = 1.08 + 0.30*(1-sat);
         var gray = r*0.299 + g*0.587 + b*0.114;
         r = gray + (r-gray)*SAT;
         g = gray + (g-gray)*SAT;
@@ -844,7 +852,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       }
 
       /* 가벼운 선명(언샤프, 3x3 라플라시안) */
-      var AMT = 0.24;
+      var AMT = 0.34;
       var out = new Uint8ClampedArray(d.length);
       out.set(d);
       var W4 = w*4;

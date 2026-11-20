@@ -202,7 +202,7 @@
   <div class="box">
     <div class="mark">Gamtan</div>
     <h1>사진 관리</h1>
-    <p>부모님 액자에 사진을 넣으려면 로그인하세요</p>
+    <p>감탄 액자에 사진을 넣으려면 로그인하세요</p>
     <div class="field">
       <label for="email">이메일</label>
       <input id="email" type="email" autocomplete="username" inputmode="email">
@@ -243,8 +243,8 @@
     <header>
       <div class="t">
         <div class="brand">Gamtan</div>
-        <h1 id="frameLabel">부모님 액자</h1>
-        <p>여기에 올린 사진이 부모님 댁 액자에 뜹니다</p>
+        <h1 id="frameLabel">감탄 액자</h1>
+        <p>여기에 올린 사진이 액자에 바로 뜹니다</p>
       </div>
       <button class="link" id="signout">로그아웃</button>
     </header>
@@ -347,6 +347,14 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
 (function(){
   "use strict";
+
+  /* 카톡·네이버 등 앱 안 브라우저에서는 홈 화면 추가가 안 됨 → 바깥 브라우저로 열기 */
+  (function(){
+    var ua = navigator.userAgent;
+    if(/KAKAOTALK/i.test(ua)){
+      location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href);
+    }
+  })();
 
   var sb = window.supabase.createClient(SB_URL, SB_KEY);
   var frame = null, member = null, photos = [], selected = {};
@@ -507,7 +515,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     });
     /* 아이폰은 자동 설치 창이 없어서 방법만 알려줌 */
     if(/iphone|ipad|ipod/i.test(navigator.userAgent)){
-      $("installTxt").textContent = "아래 공유 버튼 → '홈 화면에 추가'를 누르면 감탄 액자 아이콘이 생겨요";
+      $("installTxt").innerHTML = "<b>아이폰 아이콘 만들기</b><br>사파리 아래 <b>공유 버튼(□↑)</b>을 누르고<br>밑으로 내려 <b>'홈 화면에 추가'</b>를 눌러 주세요<br><small>공유 버튼이 안 보이면 <b>⋯</b> 버튼 → 공유</small>";
       $("installBtn").hidden = true;
       bar.hidden = false;
     }
@@ -631,7 +639,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     if(!photos.length){
       var e = document.createElement("div");
       e.className = "empty";
-      e.innerHTML = "<b>아직 올린 사진이 없습니다</b><span>사진을 올리면 부모님 액자에 곧 뜹니다</span>";
+      e.innerHTML = "<b>아직 올린 사진이 없습니다</b><span>사진을 올리면 액자에 곧 뜹니다</span>";
       listEl.appendChild(e);
     }
 

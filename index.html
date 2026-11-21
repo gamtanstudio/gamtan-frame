@@ -296,6 +296,15 @@
     </div>
 
     <div class="setting">
+      <span class="label"><b>사진 순서</b><span>액자에 나오는 순서</span></span>
+      <select id="order">
+        <option value="shuffle">섞어서</option>
+        <option value="order">올린 순서대로</option>
+        <option value="date">찍은 날짜순</option>
+      </select>
+    </div>
+
+    <div class="setting">
       <span class="label"><b>밤에 끄기</b><span>이 시간엔 화면이 꺼집니다</span></span>
       <input type="time" id="sleepFrom">
       <span style="color:var(--muted);font-size:13px">–</span>
@@ -331,7 +340,6 @@
     <div id="selbar" hidden>
       <label class="selchk"><input type="checkbox" id="selAll">전체 선택</label>
       <span class="sp"></span>
-      <button class="tbtn" id="shuffle">순서 섞기</button>
       <button class="tbtn danger" id="selDel" disabled>선택 삭제</button>
       <button class="tbtn danger" id="clearAll">전체 삭제</button>
     </div>
@@ -577,7 +585,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
   /* 액자 주인: 모든 것 / 가족: 올리기·보기·자기 사진 지우기·초대 링크 보내기·비밀번호 */
   function applyRole(){
-    ["interval", "sleepFrom", "scrBtn"].forEach(function(id){ $(id).closest(".setting").hidden = !isOwner; });
+    ["interval", "order", "sleepFrom", "scrBtn"].forEach(function(id){ $(id).closest(".setting").hidden = !isOwner; });
     $("invReset").hidden = !isOwner;
     $("clearAll").hidden = !isOwner;
   }
@@ -588,6 +596,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     if(frame.label) $("frameLabel").textContent = frame.label;
     MAX = frame.max_photos || 100;
     $("interval").value = String(frame.interval_sec);
+    $("order").value = frame.play_order || "shuffle";
     $("sleepFrom").value = frame.sleep_from ? String(frame.sleep_from).slice(0,5) : "";
     $("sleepTo").value   = frame.sleep_to   ? String(frame.sleep_to).slice(0,5)   : "";
     paintScreen();
@@ -743,7 +752,8 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       del.setAttribute("aria-label","지우기");
       del.addEventListener("click", function(){ removePhoto(p, row); });
 
-      btns.appendChild(up); btns.appendChild(dn); if(canDel(p)) btns.appendChild(del);
+      if(isOwner && frame.play_order === "order"){ btns.appendChild(up); btns.appendChild(dn); }
+      if(canDel(p)) btns.appendChild(del);
       row.appendChild(btns);
 
       listEl.appendChild(row);
@@ -766,7 +776,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     selDel.textContent = n ? ("선택 삭제 " + n) : "선택 삭제";
     var mine = photos.filter(canDel).length;
     $("selAll").checked = (mine > 0 && n === mine);
-    $("shuffle").disabled = (photos.length < 2);
   }
 
   /* ---------- 순서 ---------- */
@@ -825,24 +834,6 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     selected = {};
     if(on) photos.forEach(function(p){ if(canDel(p)) selected[pid(p)] = true; });
     render();
-  });
-
-  /* ---------- 순서 섞기 ---------- */
-  $("shuffle").addEventListener("click", function(){
-    if(photos.length < 2) return;
-    var order = photos.map(function(p){ return p.id; });
-    for(var i=order.length-1; i>0; i--){
-      var j = Math.floor(Math.random()*(i+1));
-      var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
-    }
-    var btn = this, prev = btn.textContent;
-    btn.disabled = true; btn.textContent = "섞는 중…";
-    Promise.all(order.map(function(id, idx){
-      return sb.from("photos").update({ position: idx+1 }).eq("id", id);
-    })).then(function(){
-      btn.textContent = prev;
-      return loadPhotos().then(function(){ toast("순서를 섞었습니다"); });
-    });
   });
 
   /* ---------- 손님 업로드 자동 보정 (색·밝기·대비·선명) ----------
@@ -1087,6 +1078,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   $("interval").addEventListener("change", function(){ saveFrame({ interval_sec: +this.value }); });
+  $("order").addEventListener("change", function(){ saveFrame({ play_order: this.value }); render(); });
   $("sleepFrom").addEventListener("change", saveSleep);
   $("sleepTo").addEventListener("change", saveSleep);
   function saveSleep(){

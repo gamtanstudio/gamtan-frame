@@ -205,8 +205,8 @@
     <h1>사진 관리</h1>
     <p>감탄 액자에 사진을 넣으려면 로그인하세요</p>
     <div class="field">
-      <label for="email">이메일</label>
-      <input id="email" type="email" autocomplete="username" inputmode="email">
+      <label for="email">휴대폰 번호</label>
+      <input id="email" type="tel" autocomplete="username" inputmode="numeric">
     </div>
     <div class="field">
       <label for="pw">비밀번호</label>
@@ -223,10 +223,10 @@
   <div class="box">
     <div class="mark">Gamtan</div>
     <h1 id="joinTitle">감탄 액자 연결</h1>
-    <p id="joinSub">이메일과 비밀번호를 정하면 이 액자에 바로 연결됩니다</p>
+    <p id="joinSub">휴대폰 번호와 비밀번호를 정하면 이 액자에 바로 연결됩니다</p>
     <div class="field">
-      <label for="jEmail">이메일</label>
-      <input id="jEmail" type="email" autocomplete="username" inputmode="email">
+      <label for="jEmail">휴대폰 번호</label>
+      <input id="jEmail" type="tel" autocomplete="username" inputmode="numeric">
     </div>
     <div class="field">
       <label for="jPw">비밀번호 (6자 이상)</label>
@@ -372,7 +372,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   })();
 
   var sb = window.supabase.createClient(SB_URL, SB_KEY);
-  var frame = null, member = null, photos = [], selected = {};
+  var frame = null, member = null, photos = [], selected = {}, myId = "", isOwner = true;
 
   var $ = function(id){ return document.getElementById(id); };
   function pid(p){ return String(p.id); }
@@ -388,6 +388,14 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     clearTimeout(tt); tt = setTimeout(function(){ t.classList.remove("on"); }, 2600);
   }
 
+  /* ---------- 아이디 = 휴대폰 번호 (서버에는 번호@frame.gamtan 으로 저장, 예전 이메일 계정은 그대로) ---------- */
+  function toEmail(v){
+    v = String(v || "").trim();
+    if(v.indexOf("@") >= 0) return v;
+    return v.replace(/\D/g, "") + "@frame.gamtan";
+  }
+  function okPhone(v){ return /^01\d{8,9}$/.test(String(v || "").replace(/\D/g, "")); }
+
   /* ---------- 로그인 ---------- */
   $("signin").addEventListener("click", signIn);
   $("pw").addEventListener("keydown", function(e){ if(e.key === "Enter") signIn(); });
@@ -395,10 +403,10 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   function signIn(){
     var btn = $("signin"), err = $("loginErr");
     err.textContent = ""; btn.disabled = true; btn.textContent = "로그인 중…";
-    sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pw").value })
+    sb.auth.signInWithPassword({ email: toEmail($("email").value), password: $("pw").value })
       .then(function(r){
         btn.disabled = false; btn.textContent = "로그인";
-        if(r.error){ err.textContent = "이메일이나 비밀번호를 다시 확인해주세요"; return; }
+        if(r.error){ err.textContent = "휴대폰 번호나 비밀번호를 다시 확인해주세요"; return; }
         afterAuth();
       });
   }
@@ -428,7 +436,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }
   if(INVITE){
     $("joinTitle").textContent = "가족 액자에 함께하기";
-    $("joinSub").textContent = "이메일과 비밀번호를 정하면 가족 액자에 사진을 올릴 수 있어요";
+    $("joinSub").textContent = "휴대폰 번호와 비밀번호를 정하면 가족 액자에 사진을 올릴 수 있어요";
   }
 
   function showJoin(){ boot.hidden = true; loginBox.hidden = true; $("join").hidden = false; }
@@ -465,10 +473,11 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   $("jPw2").addEventListener("keydown", function(e){ if(e.key === "Enter") join(); });
 
   function join(){
-    var email = $("jEmail").value.trim(), pw = $("jPw").value;
+    var raw = $("jEmail").value.trim(), pw = $("jPw").value;
+    var email = toEmail(raw);
     var btn = $("joinBtn"), err = $("joinErr");
     err.textContent = "";
-    if(!email || email.indexOf("@") < 0){ err.textContent = "이메일을 확인해주세요"; return; }
+    if(raw.indexOf("@") < 0 && !okPhone(raw)){ err.textContent = "휴대폰 번호를 확인해주세요"; return; }
     if(pw.length < 6){ err.textContent = "비밀번호는 6자 이상으로 정해주세요"; return; }
     if(pw !== $("jPw2").value){ err.textContent = "비밀번호가 서로 달라요. 다시 확인해주세요"; $("jPw2").value = ""; $("jPw2").focus(); return; }
     btn.disabled = true; btn.textContent = "연결하는 중…";
@@ -479,13 +488,13 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
         /* 이미 가입한 이메일이면 그 비밀번호로 로그인해서 연결 */
         return sb.auth.signInWithPassword({ email: email, password: pw }).then(function(s){
           done();
-          if(s.error){ err.textContent = "이미 가입된 이메일입니다. 비밀번호를 확인해주세요"; return; }
+          if(s.error){ err.textContent = "이미 가입된 번호입니다. 비밀번호를 확인해주세요"; return; }
           afterAuth();
         });
       }
       done();
       if(!r.data || !r.data.session){
-        err.textContent = "메일함의 확인 메일을 누른 뒤 QR을 다시 찍어주세요";
+        err.textContent = "가입을 마치지 못했어요. 사진관에 문의해 주세요";
         return;
       }
       afterAuth();
@@ -541,7 +550,8 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     boot.hidden = false; loginBox.hidden = true; app.hidden = true;
     boot.textContent = "액자를 찾는 중…";
 
-    sb.from("frame_members").select("frame_id, user_id, display_name, frames(*)").limit(1)
+    sb.auth.getSession().then(function(s){ myId = (s.data && s.data.session && s.data.session.user.id) || ""; });
+    sb.from("frame_members").select("frame_id, user_id, role, display_name, frames(*)").limit(1)
       .then(function(r){
         if(r.error || !r.data || !r.data.length){
           boot.innerHTML = "";
@@ -555,12 +565,23 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
         }
         member = r.data[0];
         frame = member.frames;
+        if(!myId) myId = member.user_id;
+        isOwner = member.role !== "family";
+        applyRole();
         fillFrame();
         return loadPhotos().then(function(){
           boot.hidden = true; app.hidden = false;
         });
       });
   }
+
+  /* 액자 주인: 모든 것 / 가족: 올리기·보기·자기 사진 지우기·초대 링크 보내기·비밀번호 */
+  function applyRole(){
+    ["interval", "sleepFrom", "scrBtn"].forEach(function(id){ $(id).closest(".setting").hidden = !isOwner; });
+    $("invReset").hidden = !isOwner;
+    $("clearAll").hidden = !isOwner;
+  }
+  function canDel(p){ return isOwner || (myId && p.uploaded_by === myId); }
 
   function fillFrame(){
     $("fcode").textContent = frame.code;
@@ -570,6 +591,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     $("sleepFrom").value = frame.sleep_from ? String(frame.sleep_from).slice(0,5) : "";
     $("sleepTo").value   = frame.sleep_to   ? String(frame.sleep_to).slice(0,5)   : "";
     paintScreen();
+    paintScr();
     paintStatus();
     paintInvite();
   }
@@ -685,6 +707,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
       var chk = document.createElement("input");
       chk.type = "checkbox"; chk.className = "rowchk"; chk.checked = !!selected[pid(p)];
+      if(!canDel(p)){ chk.disabled = true; chk.style.visibility = "hidden"; }
       chk.setAttribute("aria-label","선택");
       chk.addEventListener("change", function(){
         if(chk.checked) selected[pid(p)] = true; else delete selected[pid(p)];
@@ -720,7 +743,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       del.setAttribute("aria-label","지우기");
       del.addEventListener("click", function(){ removePhoto(p, row); });
 
-      btns.appendChild(up); btns.appendChild(dn); btns.appendChild(del);
+      btns.appendChild(up); btns.appendChild(dn); if(canDel(p)) btns.appendChild(del);
       row.appendChild(btns);
 
       listEl.appendChild(row);
@@ -735,13 +758,14 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
 
   function updateSelBar(){
     var valid = {};
-    photos.forEach(function(p){ if(selected[pid(p)]) valid[pid(p)] = true; });
+    photos.forEach(function(p){ if(selected[pid(p)] && canDel(p)) valid[pid(p)] = true; });
     selected = valid;
     var n = 0; for(var k in selected) n++;
     var selDel = $("selDel");
     selDel.disabled = (n === 0);
     selDel.textContent = n ? ("선택 삭제 " + n) : "선택 삭제";
-    $("selAll").checked = (photos.length > 0 && n === photos.length);
+    var mine = photos.filter(canDel).length;
+    $("selAll").checked = (mine > 0 && n === mine);
     $("shuffle").disabled = (photos.length < 2);
   }
 
@@ -799,7 +823,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   $("selAll").addEventListener("change", function(){
     var on = this.checked;
     selected = {};
-    if(on) photos.forEach(function(p){ selected[pid(p)] = true; });
+    if(on) photos.forEach(function(p){ if(canDel(p)) selected[pid(p)] = true; });
     render();
   });
 
@@ -1071,17 +1095,17 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
     else if(!a && !b) saveFrame({ sleep_from: null, sleep_to: null });
   }
 
-  /* 지금 끄기 / 켜기 */
-  function paintScreen(){
+  /* 지금 끄기 / 켜기 (이름이 미리보기 paintScreen과 겹쳐서 미리보기가 안 나오던 버그 → paintScr로 분리) */
+  function paintScr(){
     var off = !!frame.screen_off;
     $("scrState").textContent = off ? "꺼져 있습니다" : "켜져 있습니다";
     $("scrBtn").textContent = off ? "지금 켜기" : "지금 끄기";
   }
   $("scrBtn").addEventListener("click", function(){
     var off = !frame.screen_off;
-    frame.screen_off = off; paintScreen();
+    frame.screen_off = off; paintScr();
     sb.from("frames").update({ screen_off: off }).eq("id", frame.id).then(function(r){
-      if(r.error){ frame.screen_off = !off; paintScreen(); toast("바꾸지 못했습니다"); return; }
+      if(r.error){ frame.screen_off = !off; paintScr(); toast("바꾸지 못했습니다"); return; }
       toast(off ? "30초 안에 액자 화면이 꺼집니다" : "30초 안에 액자 화면이 켜집니다");
     });
   });

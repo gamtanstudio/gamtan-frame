@@ -687,9 +687,18 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
   }, 60000);
 
   /* ---------- 사진 목록 ---------- */
-  function publicUrl(path){
-    return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  /* 사진함은 잠겨 있음 → 로그인한 가족에게만 몇 시간짜리 열쇠 달린 주소를 받아서 보여줌 */
+  var signed = {};
+  function publicUrl(path){ return signed[path] || ""; }
+  function signAll(list){
+    var paths = list.map(function(p){ return p.path; }).filter(function(x){ return !signed[x]; });
+    if(!paths.length) return Promise.resolve();
+    return sb.storage.from(BUCKET).createSignedUrls(paths, 6 * 3600).then(function(r){
+      (r.data || []).forEach(function(x){ if(x && x.signedUrl && x.path) signed[x.path] = x.signedUrl; });
+    });
   }
+  /* 열쇠는 6시간짜리라, 화면을 오래 켜 두면 5시간마다 새로 받음 */
+  setInterval(function(){ if(frame){ signed = {}; loadPhotos(); } }, 5 * 3600 * 1000);
 
   function loadPhotos(){
     return sb.from("photos").select("*").eq("frame_id", frame.id)
@@ -697,7 +706,7 @@ var MAX = 100, LONG_EDGE = 1920, QUALITY = 0.82;
       .order("created_at", { ascending: true })
       .then(function(r){
         photos = (r.data || []);
-        render();
+        return signAll(photos).then(render, render);
       });
   }
 

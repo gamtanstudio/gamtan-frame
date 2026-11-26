@@ -138,7 +138,7 @@ var POLL_MS  = 5 * 60 * 1000;
 
   var sb = window.supabase.createClient(SB_URL, SB_KEY);
 
-  var conf = { interval_sec:30, pair_portrait:true, sleep_from:null, sleep_to:null, code:"—" };
+  var conf = { interval_sec:30, pair_portrait:true, sleep_from:null, sleep_to:null, code:"—", play_order:"shuffle" };
   var photos = [], slides = [], idx = -1, useA = true;
   var timer = null, lastSync = null, lastKey = "", failCount = 0;
 
@@ -153,8 +153,26 @@ var POLL_MS  = 5 * 60 * 1000;
     msg.hidden = false;
   }
 
+  /* 사진 저장소는 잠겨 있어서, 액자 번호(토큰)를 가진 화면만 사진 열쇠 함수로 받아 옴 */
   function urlOf(path){
-    return SB_URL + "/storage/v1/object/public/" + BUCKET + "/" + path;
+    return SB_URL + "/functions/v1/frame-photo?path=" + encodeURIComponent(path) + "&t=" + encodeURIComponent(FRAME_TOKEN);
+  }
+
+  /* 순서: 올린 순서 / 찍은 날짜순 / 섞기 (관리 화면에서 고른 대로) */
+  function ordered(list){
+    var a = list.slice();
+    if(conf.play_order === "date"){
+      a.sort(function(x, y){
+        var p = x.taken_at ? Date.parse(x.taken_at) : Infinity;
+        var q = y.taken_at ? Date.parse(y.taken_at) : Infinity;
+        return p - q;
+      });
+    }else if(conf.play_order !== "order"){
+      for(var i = a.length - 1; i > 0; i--){
+        var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+    }
+    return a;
   }
 
   /* ---------- 창고에서 받아오기 ---------- */
@@ -176,9 +194,11 @@ var POLL_MS  = 5 * 60 * 1000;
       conf.pair_portrait = d.pair_portrait !== false;
       conf.sleep_from    = d.sleep_from;
       conf.sleep_to      = d.sleep_to;
+      var po = d.play_order || "shuffle";
+      if(po !== conf.play_order){ conf.play_order = po; lastKey = ""; }
 
       var list = d.photos || [];
-      var key  = list.map(function(p){ return p.path; }).join("|");
+      var key  = conf.play_order + "#" + list.map(function(p){ return p.path; }).join("|");
 
       if(!list.length){
         lastKey = key;
@@ -191,7 +211,7 @@ var POLL_MS  = 5 * 60 * 1000;
 
       if(key === lastKey && photos.length){ restart(); return; }
       lastKey = key;
-      return measure(list);
+      return measure(ordered(list));
     }, function(){
       failCount++;
       if(!photos.length) say("연결을 기다리는 중입니다", "와이파이를 확인해 주세요");
@@ -259,7 +279,7 @@ var POLL_MS  = 5 * 60 * 1000;
     outgoing.classList.remove("on");
 
     var names = [];
-    group.forEach(function(p){ if(p.by && names.indexOf(p.by) < 0) names.push(p.by); });
+    group.forEach(function(p){ if(p.by && !/^[0-9a-f-]{36}$/i.test(p.by) && names.indexOf(p.by) < 0) names.push(p.by); });
     if(names.length){
       sender.classList.remove("on");
       senderText.textContent = names.join(", ") + "이(가) 보냈어요";
@@ -317,6 +337,29 @@ var POLL_MS  = 5 * 60 * 1000;
     lastKey = "";
     fetchManifest();
   });
+
+  /* ---------- 모니터용: 한 번 누르면 전체 화면 + 화면 안 꺼지게 ---------- */
+  function goFull(){
+    var el = document.documentElement;
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if(fn && !(document.fullscreenElement || document.webkitFullscreenElement)){
+      try{ var r = fn.call(el); if(r && r.catch) r.catch(function(){}); }catch(e){}
+    }
+    keepAwake();
+  }
+  var lock = null;
+  function keepAwake(){
+    if(!navigator.wakeLock || lock) return;
+    navigator.wakeLock.request("screen").then(function(l){
+      lock = l; l.addEventListener("release", function(){ lock = null; });
+    }, function(){});
+  }
+  document.addEventListener("click", function(e){
+    if(e.target.closest && (e.target.closest("#corner") || e.target.closest("#panel"))) return;
+    goFull();
+  });
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) keepAwake(); });
+  keepAwake();
 
   /* ---------- 시작 ---------- */
   fetchManifest();

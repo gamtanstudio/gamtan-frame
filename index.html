@@ -565,7 +565,7 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
   }
 
   $("signout").addEventListener("click", function(){
-    sb.auth.signOut().then(function(){ location.reload(); });
+    sb.auth.signOut({ scope: "local" }).then(function(){ location.reload(); });
   });
 
   /* ---------- 시작 ---------- */
@@ -624,7 +624,7 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
           p.textContent = linkNote || "연결된 액자가 없습니다. 사진관에 문의해주세요.";
           var b = document.createElement("button");
           b.className = "link swap"; b.textContent = "로그아웃";
-          b.onclick = function(){ sb.auth.signOut().then(function(){ location.reload(); }); };
+          b.onclick = function(){ sb.auth.signOut({ scope: "local" }).then(function(){ location.reload(); }); };
           boot.appendChild(p); boot.appendChild(b);
           return;
         }

@@ -929,10 +929,19 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
       });
   }
 
+  /* 확인 창(confirm) 대신: 한 번 누르면 "한 번 더 누르면 삭제", 4초 안에 다시 누르면 지움 */
+  var delArmed = false, delArmTimer = null;
   $("delGo").addEventListener("click", function(){
     var sel = photos.filter(function(p){ return selected[pid(p)]; });
     if(!sel.length) return;
-    if(!confirm(sel.length + "장을 지울까요? 되돌릴 수 없습니다.")) return;
+    if(!delArmed){
+      delArmed = true;
+      this.textContent = "한 번 더 누르면 " + sel.length + "장 삭제";
+      clearTimeout(delArmTimer);
+      delArmTimer = setTimeout(function(){ delArmed = false; updateSelBar(); }, 4000);
+      return;
+    }
+    delArmed = false; clearTimeout(delArmTimer);
     deletePhotos(sel, sel.length + "장 지웠습니다");
   });
 

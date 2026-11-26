@@ -12,6 +12,10 @@
     user-select:none;-webkit-user-select:none;cursor:none;
   }
   #stage{position:fixed;inset:0;overflow:hidden;background:#000}
+  /* 세로로 세운 모니터: 주소 끝 &r=90 또는 &r=270 이면 화면을 돌려서 꽉 채움 */
+  html.r90 #stage,html.r270 #stage{inset:auto;top:0;left:0;width:100vh;height:100vw;transform-origin:0 0}
+  html.r90 #stage{transform:translateX(100vw) rotate(90deg)}
+  html.r270 #stage{transform:translateY(100vh) rotate(-90deg)}
 
   .slot{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease}
   .slot.on{opacity:1}
@@ -135,6 +139,9 @@ var POLL_MS  = 5 * 60 * 1000;
      파일 하나로 액자 여러 대를 쓸 수 있습니다. */
   var qs = new URLSearchParams(location.search).get("t");
   if(qs) FRAME_TOKEN = qs;
+  var rot = new URLSearchParams(location.search).get("r");
+  if(rot === "90" || rot === "270") document.documentElement.classList.add("r" + rot);
+  else rot = "";
 
   var sb = window.supabase.createClient(SB_URL, SB_KEY);
 
@@ -191,7 +198,7 @@ var POLL_MS  = 5 * 60 * 1000;
 
       conf.code          = d.code;
       conf.interval_sec  = d.interval_sec || 30;
-      conf.pair_portrait = d.pair_portrait !== false;
+      conf.pair_portrait = d.pair_portrait !== false && !rot && innerWidth > innerHeight;   // 화면이 가로일 때만 세로 사진 두 장 나란히
       conf.sleep_from    = d.sleep_from;
       conf.sleep_to      = d.sleep_to;
       var po = d.play_order || "shuffle";

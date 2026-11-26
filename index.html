@@ -326,6 +326,7 @@
           <span id="seen">액자 상태를 확인하고 있습니다</span>
         </span>
         <span class="code" id="fcode">—</span>
+        <select id="frameSel" hidden></select>
       </div>
     </div>
 
@@ -612,8 +613,10 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
     boot.hidden = false; loginBox.hidden = true; app.hidden = true;
     boot.textContent = "액자를 찾는 중…";
 
-    sb.auth.getSession().then(function(s){ myId = (s.data && s.data.session && s.data.session.user.id) || ""; });
-    sb.from("frame_members").select("frame_id, user_id, role, display_name, frames(*)").limit(1)
+    sb.auth.getSession().then(function(s){
+      myId = (s.data && s.data.session && s.data.session.user.id) || "";
+      return sb.from("frame_members").select("frame_id, user_id, role, display_name, frames(*)").eq("user_id", myId);
+    })
       .then(function(r){
         if(r.error || !r.data || !r.data.length){
           boot.innerHTML = "";
@@ -625,8 +628,21 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
           boot.appendChild(p); boot.appendChild(b);
           return;
         }
-        member = r.data[0];
+        /* 액자가 여러 대인 계정: 마지막에 고른 액자를 열고, 위에서 바꿀 수 있게 */
+        var list = r.data.filter(function(x){ return x.frames; })
+          .sort(function(x, y){ return String(x.frames.code).localeCompare(String(y.frames.code)); });
+        var want = ""; try{ want = localStorage.getItem("gtFrame") || ""; }catch(e){}
+        member = list.filter(function(x){ return x.frame_id === want; })[0] || list[0];
         frame = member.frames;
+        var fs = $("frameSel");
+        fs.innerHTML = "";
+        list.forEach(function(x){
+          var o = document.createElement("option");
+          o.value = x.frame_id; o.textContent = x.frames.label ? (x.frames.label + " · " + x.frames.code) : x.frames.code;
+          fs.appendChild(o);
+        });
+        fs.value = member.frame_id;
+        fs.hidden = list.length < 2;
         if(!myId) myId = member.user_id;
         isOwner = member.role !== "family";
         applyRole();
@@ -636,6 +652,11 @@ var MAX = 500, LONG_EDGE = 1920, QUALITY = 0.82;
         });
       });
   }
+
+  $("frameSel").addEventListener("change", function(){
+    try{ localStorage.setItem("gtFrame", this.value); }catch(e){}
+    location.reload();
+  });
 
   /* 액자 주인: 모든 것 / 가족: 올리기·보기·자기 사진 지우기·초대 링크 보내기·비밀번호 */
   function applyRole(){

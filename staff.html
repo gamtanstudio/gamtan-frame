@@ -208,7 +208,7 @@ var BASE    = location.href.replace(/[^/]*$/, "");   /* 같은 폴더의 index.h
         start();
       });
   }
-  function bye(){ sb.auth.signOut().then(function(){ location.reload(); }); }
+  function bye(){ sb.auth.signOut({ scope: "local" }).then(function(){ location.reload(); }); }
   $("out").addEventListener("click", bye);
   $("out2").addEventListener("click", bye);
 

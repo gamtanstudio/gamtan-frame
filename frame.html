@@ -174,7 +174,8 @@ var POLL_MS  = 5 * 60 * 1000;
   /* ---------- 사진 저장: 한 번 받은 사진은 이 기기(브라우저) 안에 넣어 두고 다시 안 받음 ----------
      저장이 안 되는 브라우저면 예전처럼 매번 받아서 보여 줌 */
   var CACHE = "gamtan-photos-v1", CKEY = "https://gamtan-cache.invalid/";
-  var cacheOK = !!(window.caches && window.fetch && window.URL && URL.createObjectURL);
+  var cacheOK = false;
+  try{ cacheOK = !!(window.caches && window.fetch && window.Promise && window.URL && URL.createObjectURL); }catch(e){ cacheOK = false; }
   if(cacheOK && navigator.storage && navigator.storage.persist){
     try{ var pp = navigator.storage.persist(); if(pp && pp.catch) pp.catch(function(){}); }catch(e){}
   }
@@ -195,9 +196,17 @@ var POLL_MS  = 5 * 60 * 1000;
       .then(function(hit){ return hit ? hit.blob() : fromNet(path); });
   }
   function srcFor(path){
-    return getBlob(path).then(
-      function(b){ return { src: URL.createObjectURL(b), tmp: true }; },
-      function(){ return { src: urlOf(path), tmp: false }; });
+    /* 저장소가 5초 안에 답을 못 하면 예전처럼 바로 받아서 보여 줌 (화면이 멈추지 않게) */
+    return new Promise(function(resolve){
+      var done = false;
+      var fin = function(v){ if(!done){ done = true; resolve(v); } else if(v.tmp) URL.revokeObjectURL(v.src); };
+      setTimeout(function(){ fin({ src: urlOf(path), tmp: false }); }, 5000);
+      try{
+        getBlob(path).then(
+          function(b){ fin({ src: URL.createObjectURL(b), tmp: true }); },
+          function(){ fin({ src: urlOf(path), tmp: false }); });
+      }catch(e){ fin({ src: urlOf(path), tmp: false }); }
+    });
   }
   function warm(path){ if(cacheOK) getBlob(path).catch(function(){}); }
 
@@ -206,7 +215,7 @@ var POLL_MS  = 5 * 60 * 1000;
   function showCache(text){
     var el = $("cacheInfo");
     el.textContent = text; el.classList.add("on");
-    clearTimeout(ciT); ciT = setTimeout(function(){ el.classList.remove("on"); }, 8000);
+    clearTimeout(ciT); ciT = setTimeout(function(){ el.classList.remove("on"); }, 15000);
   }
   function tidyCache(list){
     if(!cacheOK){ if(!fullShown){ fullShown = true; showCache("사진 저장 안 됨"); } return; }
@@ -219,7 +228,7 @@ var POLL_MS  = 5 * 60 * 1000;
         if(have < list.length) showCache("저장 " + have + "/" + list.length + "장");
         else if(!fullShown){ fullShown = true; showCache("저장 " + have + "/" + list.length + "장 완료"); }
       });
-    }).catch(function(){});
+    }).catch(function(e){ showCache("사진 저장 안 됨 (" + ((e && e.name) || "오류") + ")"); });
   }
 
   /* 순서: 올린 순서 / 찍은 날짜순 / 섞기 (관리 화면에서 고른 대로) */

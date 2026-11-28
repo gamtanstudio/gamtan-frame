@@ -76,6 +76,11 @@
   }
   #panel button.ghost{background:transparent;color:#F2EDE4;border:1px solid rgba(242,237,228,.25);font-weight:400}
 
+  #cacheInfo{
+    position:absolute;right:22px;bottom:18px;font-size:13px;color:rgba(255,255,255,.75);
+    text-shadow:0 1px 10px rgba(0,0,0,.9);opacity:0;transition:opacity .8s ease;pointer-events:none;z-index:4;
+  }
+  #cacheInfo.on{opacity:1}
   @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
 </style>
 </head>
@@ -95,6 +100,7 @@
     </div>
   </div>
 
+  <div id="cacheInfo"></div>
   <div id="night"></div>
   <div id="corner"></div>
 
@@ -147,7 +153,7 @@ var POLL_MS  = 5 * 60 * 1000;
 
   var conf = { interval_sec:30, pair_portrait:true, sleep_from:null, sleep_to:null, code:"—", play_order:"shuffle" };
   var photos = [], slides = [], idx = -1, useA = true;
-  var timer = null, lastSync = null, lastKey = "", failCount = 0;
+  var timer = null, lastSync = null, lastKey = "", failCount = 0, turn = 0;
 
   var $ = function(id){ return document.getElementById(id); };
   var slotA = $("slotA"), slotB = $("slotB");
@@ -163,6 +169,57 @@ var POLL_MS  = 5 * 60 * 1000;
   /* 사진 저장소는 잠겨 있어서, 액자 번호(토큰)를 가진 화면만 사진 열쇠 함수로 받아 옴 */
   function urlOf(path){
     return SB_URL + "/functions/v1/frame-photo?path=" + encodeURIComponent(path) + "&t=" + encodeURIComponent(FRAME_TOKEN);
+  }
+
+  /* ---------- 사진 저장: 한 번 받은 사진은 이 기기(브라우저) 안에 넣어 두고 다시 안 받음 ----------
+     저장이 안 되는 브라우저면 예전처럼 매번 받아서 보여 줌 */
+  var CACHE = "gamtan-photos-v1", CKEY = "https://gamtan-cache.invalid/";
+  var cacheOK = !!(window.caches && window.fetch && window.URL && URL.createObjectURL);
+  if(cacheOK && navigator.storage && navigator.storage.persist){
+    try{ var pp = navigator.storage.persist(); if(pp && pp.catch) pp.catch(function(){}); }catch(e){}
+  }
+  var openC = null;
+  function cacheBox(){ if(!openC) openC = caches.open(CACHE); return openC; }
+  function ckey(path){ return CKEY + encodeURIComponent(path); }
+  function fromNet(path){
+    return fetch(urlOf(path)).then(function(r){
+      if(!r.ok) throw new Error("http " + r.status);
+      var copy = r.clone();
+      cacheBox().then(function(c){ return c.put(ckey(path), copy); }).catch(function(){});
+      return r.blob();
+    });
+  }
+  function getBlob(path){
+    if(!cacheOK) return Promise.reject(new Error("no cache"));
+    return cacheBox().then(function(c){ return c.match(ckey(path)); })
+      .then(function(hit){ return hit ? hit.blob() : fromNet(path); });
+  }
+  function srcFor(path){
+    return getBlob(path).then(
+      function(b){ return { src: URL.createObjectURL(b), tmp: true }; },
+      function(){ return { src: urlOf(path), tmp: false }; });
+  }
+  function warm(path){ if(cacheOK) getBlob(path).catch(function(){}); }
+
+  /* 목록에서 빠진 사진은 저장소에서도 지우고, 몇 장 저장됐는지 잠깐 표시(다 차면 한 번만) */
+  var ciT = null, fullShown = false;
+  function showCache(text){
+    var el = $("cacheInfo");
+    el.textContent = text; el.classList.add("on");
+    clearTimeout(ciT); ciT = setTimeout(function(){ el.classList.remove("on"); }, 8000);
+  }
+  function tidyCache(list){
+    if(!cacheOK){ if(!fullShown){ fullShown = true; showCache("사진 저장 안 됨"); } return; }
+    var keep = {};
+    list.forEach(function(p){ keep[ckey(p.path)] = 1; });
+    cacheBox().then(function(c){
+      return c.keys().then(function(ks){
+        var have = 0;
+        ks.forEach(function(k){ if(keep[k.url]) have++; else c.delete(k); });
+        if(have < list.length) showCache("저장 " + have + "/" + list.length + "장");
+        else if(!fullShown){ fullShown = true; showCache("저장 " + have + "/" + list.length + "장 완료"); }
+      });
+    }).catch(function(){});
   }
 
   /* 순서: 올린 순서 / 찍은 날짜순 / 섞기 (관리 화면에서 고른 대로) */
@@ -205,6 +262,7 @@ var POLL_MS  = 5 * 60 * 1000;
       if(po !== conf.play_order){ conf.play_order = po; lastKey = ""; }
 
       var list = d.photos || [];
+      if(list.length) tidyCache(list);
       var key  = conf.play_order + "#" + list.map(function(p){ return p.path; }).join("|");
 
       if(!list.length){
@@ -227,6 +285,16 @@ var POLL_MS  = 5 * 60 * 1000;
 
   /* ---------- 가로/세로 재기 ---------- */
   function measure(list){
+    /* 두 장 나란히 쓰지 않는 화면(세운 모니터 등)은 가로/세로를 잴 필요가 없음 → 사진을 미리 다 받지 않음 */
+    if(!conf.pair_portrait){
+      photos = list.map(function(p){ return { path:p.path, url:urlOf(p.path), by:p.by, name:p.name, portrait:false }; });
+      build();
+      msg.hidden = true;
+      idx = -1;
+      next();
+      restart();
+      return Promise.resolve();
+    }
     return new Promise(function(resolve){
       var out = [], left = list.length;
       list.forEach(function(p, i){
@@ -234,7 +302,8 @@ var POLL_MS  = 5 * 60 * 1000;
         var im = new Image();
         im.onload = im.onerror = function(){
           var w = im.naturalWidth || 1, h = im.naturalHeight || 1;
-          out[i] = { url:u, by:p.by, name:p.name, portrait: h > w * 1.05 };
+          if(im._tmp) URL.revokeObjectURL(im.src);
+          out[i] = { path:p.path, url:u, by:p.by, name:p.name, portrait: h > w * 1.05 };
           if(--left === 0){
             photos = out.filter(Boolean);
             build();
@@ -245,7 +314,7 @@ var POLL_MS  = 5 * 60 * 1000;
             resolve();
           }
         };
-        im.src = u;
+        srcFor(p.path).then(function(s){ im._tmp = s.tmp; im.src = s.src; });
       });
     });
   }
@@ -272,18 +341,35 @@ var POLL_MS  = 5 * 60 * 1000;
     useA = !useA;
 
     var panes = incoming.querySelector(".panes");
-    panes.innerHTML = "";
-    group.forEach(function(p){
-      var pane = document.createElement("div"); pane.className = "pane";
-      var bg = document.createElement("div"); bg.className = "bg";
-      bg.style.backgroundImage = 'url("' + p.url + '")';
-      var im = document.createElement("img"); im.src = p.url; im.alt = "";
-      pane.appendChild(bg); pane.appendChild(im);
-      panes.appendChild(pane);
+    var myTurn = ++turn;
+    /* 새 사진이 다 준비된 뒤에 바꿈 (준비 전엔 지금 사진 그대로) */
+    Promise.all(group.map(function(p){ return srcFor(p.path); })).then(function(srcs){
+      if(myTurn !== turn){
+        srcs.forEach(function(s){ if(s.tmp) URL.revokeObjectURL(s.src); });
+        return;
+      }
+      (incoming._urls || []).forEach(function(u){ URL.revokeObjectURL(u); });
+      incoming._urls = srcs.filter(function(s){ return s.tmp; }).map(function(s){ return s.src; });
+      panes.innerHTML = "";
+      var pending = group.length, went = false;
+      var go = function(){
+        if(went || myTurn !== turn) return; went = true;
+        incoming.classList.add("on");
+        outgoing.classList.remove("on");
+      };
+      var ready = function(){ if(--pending <= 0) go(); };
+      setTimeout(go, 4000);
+      group.forEach(function(p, k){
+        var pane = document.createElement("div"); pane.className = "pane";
+        var bg = document.createElement("div"); bg.className = "bg";
+        bg.style.backgroundImage = 'url("' + srcs[k].src + '")';
+        var im = document.createElement("img"); im.alt = "";
+        im.onload = ready; im.onerror = ready;
+        im.src = srcs[k].src;
+        pane.appendChild(bg); pane.appendChild(im);
+        panes.appendChild(pane);
+      });
     });
-
-    incoming.classList.add("on");
-    outgoing.classList.remove("on");
 
     var names = [];
     group.forEach(function(p){ if(p.by && !/^[0-9a-f-]{36}$/i.test(p.by) && names.indexOf(p.by) < 0) names.push(p.by); });
@@ -295,7 +381,7 @@ var POLL_MS  = 5 * 60 * 1000;
     }
 
     var nx = slides[(idx + 1) % slides.length];
-    if(nx) nx.forEach(function(p){ var i2 = new Image(); i2.src = p.url; });
+    if(nx) nx.forEach(function(p){ warm(p.path); });
   }
 
   function restart(){
